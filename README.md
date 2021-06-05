@@ -4,7 +4,7 @@
 
 
 ## Introduction
-Just some simple function to load models and render scene
+Just some simple function to load models and render the scene
 
 support Blender 2.8+, 2.9+
 
