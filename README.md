@@ -17,6 +17,8 @@ blender -b --python-expr "__import__('ensurepip')._bootstrap()"
 blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'pip', 'setuptools', 'wheel'])"
 # pip install trimesh
 blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'trimesh'])"
+# pip install PIL
+blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'pillow'])"
 ```
 
 ## Usage
