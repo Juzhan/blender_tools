@@ -11,8 +11,10 @@ if not dir in sys.path:
     sys.path.append(dir)
 
 # change to your path here
-ROOT_DIR = "C://Users//a7904//Desktop//blender_tools"
+ROOT_DIR = "F:/Project/blender_tools"
 DATA_DIR = os.path.join(ROOT_DIR, "env_data")
+
+sys.path.append(ROOT_DIR)
 
 import render
 import material

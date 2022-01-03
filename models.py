@@ -62,9 +62,14 @@ class PointCloudMaker():
 
         # display shadow on cycles mode
         
-        template_sphere.cycles_visibility.diffuse = False
-        template_sphere.cycles_visibility.glossy = False
-        template_sphere.cycles_visibility.shadow = False
+        if bpy.app.version[0] == 2:
+            template_sphere.cycles_visibility.diffuse = False
+            template_sphere.cycles_visibility.glossy = False
+            template_sphere.cycles_visibility.shadow = False
+        else:
+            template_sphere.visible_diffuse = False
+            template_sphere.visible_glossy = False
+            template_sphere.visible_shadow = False
 
         self.instancers.append(instancer)
 
@@ -170,10 +175,15 @@ def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
             object.rotation_mode = 'QUATERNION'
             object.rotation_quaternion = obj_rot
             object.location = obj_pos
-    
-    object.cycles_visibility.diffuse = diffuse
-    object.cycles_visibility.glossy = glossy
-    object.cycles_visibility.shadow = shadow
+
+    if bpy.app.version[0] == 2:
+        object.cycles_visibility.diffuse = diffuse
+        object.cycles_visibility.glossy = glossy
+        object.cycles_visibility.shadow = shadow   
+    else:
+        object.visible_diffuse = diffuse
+        object.visible_glossy = glossy
+        object.visible_shadow = shadow
 
     object.data.use_auto_smooth = use_auto_smooth
 
@@ -255,10 +265,16 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color, \
     object.rotation_mode = 'XYZ'
     object.rotation_euler= obj_rot
     object.location= obj_pos
-    
-    object.cycles_visibility.diffuse = diffuse
-    object.cycles_visibility.glossy = glossy
-    object.cycles_visibility.shadow = shadow
+
+
+    if bpy.app.version[0] == 2:
+        object.cycles_visibility.diffuse = diffuse
+        object.cycles_visibility.glossy = glossy
+        object.cycles_visibility.shadow = shadow   
+    else:
+        object.visible_diffuse = diffuse
+        object.visible_glossy = glossy
+        object.visible_shadow = shadow
 
     if texture_path is not None:
         image_material(object, obj_name, obj_color, texture_path, normal_path)
