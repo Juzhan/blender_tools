@@ -270,11 +270,47 @@ def new_pure_color_material( mat_name, color, shadow_mode="NONE"):
     rgb_color_node.outputs[0].default_value[0] = color[0]
     rgb_color_node.outputs[0].default_value[1] = color[1]
     rgb_color_node.outputs[0].default_value[2] = color[2]
-    link = links.new( rgb_color_node.outputs['Color'], output_node.inputs['Surface'] )
+    links.new( rgb_color_node.outputs['Color'], output_node.inputs['Surface'] )
     
     mat.shadow_method = shadow_mode
 
     return mat
+
+def vertex_color_material( mat_name, vertex_color_name):
+    '''
+    Args:
+        mat_name: str
+        vertex_color_name: str
+    
+    Returns:
+        material: bpy.data.materials[xxx]
+    '''
+    
+    mat = bpy.data.materials.get(mat_name)
+
+    if mat == None:
+        mat = bpy.data.materials.new(mat_name)
+        mat.use_nodes = True
+    
+    nodes = mat.node_tree.nodes
+    nodes.clear()
+
+    links = mat.node_tree.links
+
+    output_node = nodes.new('ShaderNodeOutputMaterial')
+
+    diffuse_node = nodes.new("ShaderNodeBsdfDiffuse")
+
+    attribute_node = nodes.new("ShaderNodeAttribute")
+
+    links.new( diffuse_node.outputs['BSDF'], output_node.inputs['Surface'] )
+    links.new( attribute_node.outputs['Color'], diffuse_node.inputs['Color'] )
+
+    attribute_node.attribute_type = 'GEOMETRY'
+    attribute_node.attribute_name = vertex_color_name
+
+    return mat
+
 
 
 #============----------------   color   ----------------============#

@@ -70,7 +70,7 @@ def new_camera(name='Camera'):
     return camera_object
 
 def set_render( resolution_x=640, resolution_y=480, engine="CYCLES", samples=128 ):
-    # 'CYCLES' or 'EEVEE'
+    # 'CYCLES' or 'BLENDER_EEVEE'
     
     bpy.context.scene.render.engine = engine
     bpy.context.scene.cycles.samples = samples

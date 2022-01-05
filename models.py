@@ -14,7 +14,15 @@ if not dir in sys.path:
 from material import *
 from transform import *
 # 
-
+def set_visible_property(object, diffuse=True, glossy=True, shadow=True):
+    if bpy.app.version[0] == 3:
+        object.visible_diffuse = diffuse
+        object.visible_glossy = glossy
+        object.visible_shadow = shadow
+    else:    
+        object.cycles_visibility.diffuse = diffuse
+        object.cycles_visibility.glossy = glossy
+        object.cycles_visibility.shadow = shadow
 
 # https://github.com/itsumu/point_cloud_renderer
 class PointCloudMaker():
@@ -62,14 +70,8 @@ class PointCloudMaker():
 
         # display shadow on cycles mode
         
-        if bpy.app.version[0] == 2:
-            template_sphere.cycles_visibility.diffuse = False
-            template_sphere.cycles_visibility.glossy = False
-            template_sphere.cycles_visibility.shadow = False
-        else:
-            template_sphere.visible_diffuse = False
-            template_sphere.visible_glossy = False
-            template_sphere.visible_shadow = False
+        set_visible_property(template_sphere, False, False, False)
+
 
         self.instancers.append(instancer)
 
@@ -119,6 +121,61 @@ def reset(pcm=None, clear_instancers=False, clear_database=False):
             bpy.data.images.remove(image)
     # print('reset time: ', time.time() - start_time)
 
+
+# code from https://github.com/ianhuang0630/blender_render
+def pc_rgb( pc_name, points, colors, obj_pos, obj_scale, point_radius=0.01, \
+    diffuse=False, glossy=False, shadow=False ):
+
+    points *= obj_scale
+    points += obj_pos
+
+    sphere_mesh = bpy.data.meshes.new('sphere')
+    sphere_bmesh = bmesh.new()
+
+    if bpy.app.version[0] == 3:
+        bmesh.ops.create_icosphere(sphere_bmesh, subdivisions=2, radius=point_radius)
+    else:
+        bmesh.ops.create_icosphere(sphere_bmesh, subdivisions=2, diameter=point_radius*2)
+    
+    sphere_bmesh.to_mesh(sphere_mesh)
+    sphere_bmesh.free()
+    
+    sphere_verts = np.array([[v.co.x, v.co.y, v.co.z] for v in sphere_mesh.vertices])
+    sphere_faces = np.array([[p.vertices[0], p.vertices[1], p.vertices[2]] for p in sphere_mesh.polygons])
+    # 
+    verts = (np.expand_dims(sphere_verts, axis=0) + np.expand_dims(points, axis=1)).reshape(-1, 3)
+    faces = (np.expand_dims(sphere_faces, axis=0) + (np.arange(points.shape[0]) * sphere_verts.shape[0]).reshape(-1, 1, 1)).reshape(-1, 3)
+
+    vert_colors = np.repeat(colors, sphere_verts.shape[0], axis=0).astype(dtype='float64')
+    vert_colors = vert_colors[faces.reshape(-1), :]
+    # 
+    verts[:, 2] -= verts.min(axis=0)[2]
+    # 
+    # print(verts.shape, faces.shape, vert_colors.shape)
+
+    verts = verts.tolist()
+    faces = faces.tolist()
+    vert_colors = vert_colors.tolist()
+    # 
+    mesh = bpy.data.meshes.new(pc_name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.validate()
+
+    vertex_color_name = pc_name + '_Col'
+    mesh.vertex_colors.new(name= vertex_color_name)
+    mesh_vert_colors = mesh.vertex_colors[ vertex_color_name]
+    
+    for i, c in enumerate(mesh_vert_colors.data):
+        c.color = vert_colors[i]  + [1.0]
+
+    obj = bpy.data.objects.new(pc_name, mesh)
+    bpy.context.collection.objects.link(obj)
+
+    # add material
+    obj_mat = vertex_color_material( pc_name, vertex_color_name )
+    obj.data.materials.append( obj_mat )
+    
+    set_visible_property(obj, diffuse, glossy, shadow)
 
 #=============================#
 #=                           =#
@@ -176,14 +233,7 @@ def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
             object.rotation_quaternion = obj_rot
             object.location = obj_pos
 
-    if bpy.app.version[0] == 2:
-        object.cycles_visibility.diffuse = diffuse
-        object.cycles_visibility.glossy = glossy
-        object.cycles_visibility.shadow = shadow   
-    else:
-        object.visible_diffuse = diffuse
-        object.visible_glossy = glossy
-        object.visible_shadow = shadow
+    set_visible_property(object, diffuse, glossy, shadow)
 
     object.data.use_auto_smooth = use_auto_smooth
 
@@ -266,15 +316,8 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color, \
     object.rotation_euler= obj_rot
     object.location= obj_pos
 
+    set_visible_property(object, diffuse, glossy, shadow)
 
-    if bpy.app.version[0] == 2:
-        object.cycles_visibility.diffuse = diffuse
-        object.cycles_visibility.glossy = glossy
-        object.cycles_visibility.shadow = shadow   
-    else:
-        object.visible_diffuse = diffuse
-        object.visible_glossy = glossy
-        object.visible_shadow = shadow
 
     if texture_path is not None:
         image_material(object, obj_name, obj_color, texture_path, normal_path)
