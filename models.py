@@ -183,7 +183,7 @@ def pc_rgb( pc_name, points, colors, obj_pos, obj_scale, point_radius=0.01, \
 #=                           =#
 #=============================#
 
-def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
+def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, obj_scale=1, \
         texture_path=None, normal_path=None, \
         diffuse=False, glossy=False, shadow=True, use_auto_smooth=False ):
     '''
@@ -202,6 +202,8 @@ def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
         bpy.ops.import_scene.obj( filepath=filename )
     elif filename.endswith('ply'):
         bpy.ops.import_mesh.ply( filepath=filename )
+    elif filename.endswith('stl'):
+        bpy.ops.import_mesh.stl( filepath=filename )
     
     name = filename.split('/')[-1].split('\\')[-1].split('.')[0][:10]
 
@@ -222,6 +224,7 @@ def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
     object.name = obj_name
     object.rotation_mode = 'XYZ'
     object.rotation_euler = [0, 0, 0]
+    object.scale = [obj_scale, obj_scale, obj_scale]
 
     if obj_rot is not None:
         if len(obj_rot) == 3:
@@ -239,7 +242,7 @@ def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
 
     if texture_path is not None:
         image_material(object, obj_name, obj_color, texture_path, normal_path)
-    else:
+    elif obj_color is not None:
         color_material(object, obj_name, obj_color)
     return object
 
