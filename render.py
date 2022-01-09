@@ -11,7 +11,7 @@ if not dir in sys.path:
 
 from transform import *
 
-def do_render(render_path, color_management='Standard', color_mode='RGBA', bg_transparent=True, format="PNG"):
+def do_render(render_path, color_management='Standard', color_mode='RGBA', bg_transparent=True, format="PNG", adaptive_threshold=0.1):
     '''
     Args:
         render_path: str
@@ -32,6 +32,9 @@ def do_render(render_path, color_management='Standard', color_mode='RGBA', bg_tr
     #set the background as transparent if transparent_background is true in yaml
     render.film_transparent = bg_transparent
     render.image_settings.file_format = format
+
+    bpy.context.scene.cycles.adaptive_threshold = adaptive_threshold
+
     bpy.ops.render.render(write_still=True)
 
 def new_sun(name="Sun"):
@@ -136,7 +139,7 @@ def set_sun( energy = 3, sun_rot = [0, 0, 0], sun_name='Sun' ):
     sun.data.energy = energy
     return sun
 
-def set_hdr_background( hdr_path, rotation=[0,0,0] ):
+def set_hdr_background( hdr_path, rotation=[0,0,0], strength=1 ):
     '''
     Add hdr for scene
     
@@ -161,12 +164,15 @@ def set_hdr_background( hdr_path, rotation=[0,0,0] ):
     hdr_tex = nodes.new(type="ShaderNodeTexEnvironment")
     mapping = nodes.new(type="ShaderNodeMapping")
     tex_coord = nodes.new(type="ShaderNodeTexCoord")
+    bg = nodes.new(type="ShaderNodeBackground")
     
     img = bpy.data.images.load(hdr_path)
     hdr_tex.image = img
 
     mapping.inputs['Rotation'].default_value = rotation
+    bg.inputs['Strength'].default_value = strength
 
     links.new( tex_coord.outputs['Object'], mapping.inputs['Vector'] )
     links.new( mapping.outputs['Vector'], hdr_tex.inputs['Vector'] )
-    links.new( hdr_tex.outputs['Color'], output_node.inputs['Surface'] )
+    links.new( hdr_tex.outputs['Color'], bg.inputs['Color'] )
+    links.new( bg.outputs['Background'], output_node.inputs['Surface'] )
