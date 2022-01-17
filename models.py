@@ -301,18 +301,33 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color, \
     Returns:
         object: bpy.data.object
     '''
+
     if obj_type == 'cylinder':
         bpy.ops.mesh.primitive_cylinder_add(vertices=shape_setting['vertices'])
+        init_name = 'Cylinder'
+
     elif obj_type == 'plane':
         bpy.ops.mesh.primitive_plane_add()
+        init_name = 'Plane'
+
     elif obj_type == 'cube':
         bpy.ops.mesh.primitive_cube_add()
+        init_name = 'Cube'
+
     elif obj_type == 'sphere':
         bpy.ops.mesh.primitive_uv_sphere_add()
+        init_name = 'Sphere'
+        
     elif obj_type == 'cone':
         bpy.ops.mesh.primitive_cone_add(radius1=shape_setting['radius1'], radius2=shape_setting['radius2'], depth=shape_setting['depth'])
+        init_name = 'Cone'
 
-    object = bpy.context.active_object
+    for o in bpy.data.objects:
+        if o.name == init_name:
+            object = o
+            break
+    # object = bpy.context.active_object
+
     object.name = obj_name
     object.scale = obj_size
     object.rotation_mode = 'XYZ'

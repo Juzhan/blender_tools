@@ -49,7 +49,7 @@ render.set_render()
 plane = models.add_shape("plane", 'plane', [0,0,0], [0,0,0], [1,1,1], [1,1,1,1], None )
 
 banana = models.add_model(
-    os.path.join(DATA_DIR, "model/banana/from_dae.obj"), 'banana', [0,0,0,1], [0,0,0.02], [0,0,0], 
+    os.path.join(DATA_DIR, "model/banana/from_dae.obj"), 'banana', [0,0,0,1], [0,0,0.02], [0,0,0], 1, 
     os.path.join(DATA_DIR, "model/banana/texture_map.png")
 )
 
