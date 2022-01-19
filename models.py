@@ -326,7 +326,7 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color, \
         if o.name == init_name:
             object = o
             break
-    # object = bpy.context.active_object
+    object = bpy.context.active_object
 
     object.name = obj_name
     object.scale = obj_size
