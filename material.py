@@ -1,11 +1,14 @@
 import bpy
 import math
 import numpy as np
-from mathutils import Color, Vector
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
 # some color looks nice
 colors = [ "#ffffff",  "#9075de", "#e55953", "#e28678", "#dbcc7b", "#9dc756", "#77cb45", "#c0bed3", "#a0c8c0" ]
-colors = [ "#FBB5AF", "#FBE06F", "#B0E586", "#8AD4D5", "#718DD5", "#A38DDE", "#9ED68C", "#61abff", "#ffb056" ]
+colors = [ "#FBB5AF", "#FBE06F", "#B0E586", "#8AD4D5", "#718DD5", "#A38DDE", "#9ED68C", "#61abff", "#ffb056", '#A9CBFF' ]
 
 pure_colors = [ 
     [1,1,1, 0.5],
@@ -81,7 +84,7 @@ def image_material( object, mat_name, color, color_texture, normal_texture, shad
     principled_node.inputs.get("Emission Strength").default_value = 0
     principled_node.inputs.get("Alpha").default_value = color[3]
 
-    link = links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
+    links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
 
     # add color image
     image_node = nodes.new(type="ShaderNodeTexImage")
@@ -122,7 +125,6 @@ def pure_color_material( object, mat_name, color, shadow_mode='OPAQUE'):
     Returns:
         None
     '''
-
     mat = bpy.data.materials.get(mat_name)
 
     if mat == None:
@@ -184,7 +186,7 @@ def color_material( object, mat_name, color=(1,0,0,1), shadow_mode='OPAQUE'):
     # principled_node.inputs.get("Roughness").default_value = 1.0
     # principled_node.inputs.get("Emission Strength").default_value = 0
     
-    link = links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
+    links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
 
     if color[-1] < 1:
         mat.blend_method = 'BLEND'
@@ -225,10 +227,7 @@ def new_color_material(mat_name, color, shadow_mode='OPAQUE'):
     principled_node.inputs.get("Base Color").default_value = color
     principled_node.inputs.get("Alpha").default_value = color[3]
 
-    # principled_node.inputs.get("Roughness").default_value = 1.0
-    # principled_node.inputs.get("Emission Strength").default_value = 0
-    
-    link = links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
+    links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
 
     if color[-1] < 1:
         mat.blend_method = 'BLEND'
@@ -270,14 +269,146 @@ def new_pure_color_material( mat_name, color, shadow_mode="NONE"):
     rgb_color_node.outputs[0].default_value[0] = color[0]
     rgb_color_node.outputs[0].default_value[1] = color[1]
     rgb_color_node.outputs[0].default_value[2] = color[2]
-    link = links.new( rgb_color_node.outputs['Color'], output_node.inputs['Surface'] )
+    links.new( rgb_color_node.outputs['Color'], output_node.inputs['Surface'] )
     
     mat.shadow_method = shadow_mode
 
     return mat
 
+def vertex_color_material( object, mat_name, vertex_color_name):
+    '''
+    Args:
+        object: bpy.data.objects[xxx]
+        mat_name: str
+        vertex_color_name: str
+    
+    Returns:
+        material: bpy.data.materials[xxx]
+    '''
+    
+    mat = bpy.data.materials.get(mat_name)
+
+    if mat == None:
+        mat = bpy.data.materials.new(mat_name)
+        mat.use_nodes = True
+    
+    nodes = mat.node_tree.nodes
+    nodes.clear()
+
+    links = mat.node_tree.links
+
+    output_node = nodes.new('ShaderNodeOutputMaterial')
+
+    diffuse_node = nodes.new("ShaderNodeBsdfDiffuse")
+
+    attribute_node = nodes.new("ShaderNodeAttribute")
+
+    links.new( diffuse_node.outputs['BSDF'], output_node.inputs['Surface'] )
+    links.new( attribute_node.outputs['Color'], diffuse_node.inputs['Color'] )
+
+    attribute_node.attribute_type = 'GEOMETRY'
+    attribute_node.attribute_name = vertex_color_name
+
+    obj_mats = object.data.materials
+    obj_mats.clear()
+    obj_mats.append(mat)
+    object.active_material = mat
+
+    return mat
+
+
+def rgb_color_material( object, mat_name, vertex_color_name, shadow_mode='OPAQUE'):
+    '''
+    Args:
+        object: bpy.data.objects[xxx]
+        mat_name: str
+        color: list[float] 4
+        shadow_mode: str (only work for eevee?)
+            "OPAQUE" for shadow \\
+            "NONE" for none
+    
+    Returns:
+        None
+    '''
+    mat = bpy.data.materials.get(mat_name)
+    if mat is None:
+        mat = bpy.data.materials.new(mat_name)
+    
+    mat.name = mat_name
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    nodes.clear()
+    links = mat.node_tree.links
+
+    vertex_color_node = nodes.new('ShaderNodeVertexColor')
+    principled_node = nodes.new('ShaderNodeBsdfPrincipled')
+    output_node = nodes.new('ShaderNodeOutputMaterial')
+    
+    vertex_color_node.layer_name = vertex_color_name
+
+    links.new( vertex_color_node.outputs['Color'], principled_node.inputs['Base Color'] )
+    
+    links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
+
+    mat.shadow_method = shadow_mode
+
+    obj_mats = object.data.materials
+    obj_mats.clear()
+    obj_mats.append(mat)
+    object.active_material = mat
+    return mat
+
+
+def set_mat_color(mat_name, color):
+    if mat_name not in bpy.data.materials.keys():
+        print(" NOT SUCH MATERIAL: %s" % mat_name)
+        return
+    
+    mat = bpy.data.materials.get(mat_name)
+    mat.node_tree.nodes["Principled BSDF"].inputs['Base Color'].default_value = color
+    mat.node_tree.nodes["Principled BSDF"].inputs['Alpha'].default_value = color[3]
+
+def change_pc_mat(alpha):
+    mat_name = 'PCParticlesMaterial'
+    mat = bpy.data.materials[mat_name]
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    
+    if 'Principled BSDF' not in nodes.keys():
+        node = nodes.new('ShaderNodeBsdfPrincipled')
+
+    else:
+        nodes['Principled BSDF']
+
+    image_node = nodes['Image Texture']
+    output_node = nodes['Material Output']
+    links.new( node.outputs['BSDF'], output_node.inputs['Surface'] )
+    links.new( image_node.outputs['Color'], node.inputs['Base Color'] )
+
+    node.inputs['Alpha'].default_value = alpha
+    
+
 
 #============----------------   color   ----------------============#
+
+def get_cmap_color(data, min_color=None, max_color=None, cmap_type='jet'):
+    data = np.array(data)
+    
+    if min_color:
+        colors = [min_color, max_color]
+        n_bin = 100
+        cmap = LinearSegmentedColormap.from_list('my', colors, N=n_bin)
+    else:
+        cmap = plt.get_cmap(cmap_type)
+
+    data_max = data.max()
+    data_min = data.min()
+    
+    data = (data - data_min) / (data_max - data_min)
+    # data = 1-data
+    cmap_colors = cmap(data)
+
+    return cmap_colors
 
 def hsv2rgb(h, s, v):
     """
@@ -326,100 +457,3 @@ def rgb2hsv(r, g, b):
     v = mx
     return h, s, v
 
-def hsv(minimum, maximum, value):
-    '''
-    Args:
-        minimun: float
-        maximun: float
-        value: float
-    
-    Returns:
-        [R,G,B]
-    '''
-    
-    minimum, maximum = float(minimum), float(maximum)
-    ratio = (value-minimum) / (maximum - minimum)
-    
-    h, s, v = 0.3, 0.8, 1
-    
-    v = ratio
-    
-    r,g,b = hsv2rgb(h,s,v)
-    
-    return r/255, g/255, b/255, #g/255, b/255
-
-def rgb(minimum, maximum, value):
-    # https://stackoverflow.com/questions/20792445/calculate-rgb-value-for-a-range-of-values-to-create-heat-map
-    minimum, maximum = float(minimum), float(maximum)
-    ratio = 1*(value-minimum) / (maximum - minimum)
-    
-    r = int(max(0, 255*(1 - ratio)))
-    b = int(max(0, 255*(ratio - 1)))
-    g = 255 - b - r
-    
-    return r/255, g/255, b/255
-
-def color_map(minimum, maximum, value, \
-    min_color=np.array( hex_to_rgba('#9FFF7C')[:3] ),
-    max_color=np.array( hex_to_rgba('#3A6729')[:3] )
-    ):
-    """
-    Simple linear interpolation
-    """
-
-    minimum, maximum = float(minimum), float(maximum)
-    x = (value) / (maximum - minimum)
-    b = minimum / (maximum - minimum)
-
-    ratio = x * (x - b)
-    
-    ret_color = min_color * (1-ratio) + max_color * ratio
-    for i in range(3):
-        ret_color[i] = max(ret_color[i], 0)
-        ret_color[i] = min(ret_color[i], 1)
-    
-    return ret_color
-
-
-# def use_material_old( object, mat_name, color_id = 0):
-#     '''
-#     object: bpy.data.objects[xxx]
-#     '''
-
-#     obj_name = object.name
-#     if mat_name == "VertexColor":
-#         mat_name = mat_name
-#     else:
-#         mat_name = mat_name + "_" + str(color_id)
-
-#     mat = bpy.data.materials.get(mat_name)
-
-#     if mat == None:
-#         mat = bpy.data.materials.new(mat_name)
-#         mat.use_nodes = True
-        
-#         nodes = mat.node_tree.nodes
-#         links = mat.node_tree.links
-#         principled_node = nodes.get('Principled BSDF')
-#         output_node = nodes.get("Material Output")
-
-#         if "VertexColor" in mat_name:
-#             vertex_color_node = nodes.new(type="ShaderNodeVertexColor")
-#             vertex_color_node.location = -200, 300
-#             vertex_color_node.layer_name = obj_name
-#             link = links.new( vertex_color_node.outputs['Color'], output_node.inputs['Surface'] )
-        
-#         elif "Instance" in mat_name:
-#             rgb_color_node = nodes.new(type="ShaderNodeRGB")
-#             rgb_color_node.location = -200, 300
-#             rgb_color_node.color = (object["inst_id"], object["inst_id"], object["inst_id"])
-#             link = links.new( rgb_color_node.outputs['Color'], output_node.inputs['Surface'] )
-        
-#         else:
-#             color = colors[color_id % len(colors)]
-#             principled_node.inputs.get("Base Color").default_value = hex_to_rgba(color)
-
-#     obj_mats = object.data.materials
-#     obj_mats.clear()
-#     obj_mats.append(mat)
-#     object.active_material = mat

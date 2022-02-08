@@ -7,112 +7,141 @@ import numpy as np
 import bpy
 import bmesh
 
-dir = os.path.dirname(bpy.data.filepath)
-if not dir in sys.path:
-    sys.path.append(dir)
+from scipy.spatial.transform import Rotation
+import trimesh
+
+# dir = os.path.dirname(bpy.data.filepath)
+# if not dir in sys.path:
+#     sys.path.append(dir)
 
 from material import *
 from transform import *
 # 
-
+def set_visible_property(object, diffuse=True, glossy=True, shadow=True):
+    if bpy.app.version[0] == 3:
+        object.visible_diffuse = diffuse
+        object.visible_glossy = glossy
+        object.visible_shadow = shadow
+    else:    
+        object.cycles_visibility.diffuse = diffuse
+        object.cycles_visibility.glossy = glossy
+        object.cycles_visibility.shadow = shadow
 
 # https://github.com/itsumu/point_cloud_renderer
-class PointCloudMaker():
-    def __init__(self, type='ico_sphere'):
-        self.type = type
-        self.active_object = bpy.context.active_object
-        bpy.app.debug_value = 0
-        self.instancers = []
 
-    # Utility function to generate numpy points from ascii point cloud files
-    def generate_points_from_pts(self, filename):
-        points = np.loadtxt(filename)
-        return points
+def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj_scale=1 ):
 
-    def load_points(self, filename):
-        # import open3d as o3d
-        import trimesh
+    if filename:
         pc = trimesh.load_mesh(filename)
-        # pc = o3d.io.read_point_cloud(filename)
-        # return np.array(pc.points)
-        return np.array(pc.vertices)
+        points = np.array(pc.vertices)
+    
+    points *= obj_scale
+    points += np.array(pos)
 
-    # Convert points to spheres
-    def convert_to_spheres(self, points=None, name='pc', color=[1,0,0,1], sphere_radius=0.01):
-        # start_time = time.time()
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=sphere_radius)
+    tmp_obj = bpy.context.active_object
+    tmp_obj.name = name + "_tmp"
+    tmp_obj.data.name = name + "_tmp"
 
-        if self.type == 'ico_sphere':
-            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=sphere_radius)
-        elif self.type == 'cube':
-            bpy.ops.mesh.primitive_cube_add(size=sphere_radius)
-        template_sphere = bpy.context.active_object
-        template_sphere.name = name + "_pc"
+    bpy.ops.mesh.primitive_plane_add()
+    instancer = bpy.context.active_object
+    instancer.name = name + "_point_cloud"
+    instancer_mesh = instancer.data
+    instancer_mesh.name = instancer.name
 
-        bpy.ops.mesh.primitive_plane_add()
-        instancer = bpy.context.active_object
-        instancer.name = name + "_pc_parent"
-        instancer_mesh = instancer.data
-        bm = bmesh.new()
-        for i in range(points.shape[0]):
-            bm.verts.new().co = points[i, :]
-        bm.to_mesh(instancer_mesh)
-        template_sphere.parent = instancer
-        instancer.instance_type = 'VERTS'
-        color_material(template_sphere, template_sphere.name, color=color, shadow_mode='NONE')
+    # add face for each vertices
+    scale = 0.001
+    
+    img_w = (np.ceil(np.sqrt(len(points))) + 1) * 3
+    bm = bmesh.new()
 
-        # display shadow on cycles mode
+    offsets = [
+        [0, 1, 0],
+        [1, 1, 0],
+        [1, 0, 0],
+        [0, 0, 0],
+    ]
+
+    # new rectangular
+    for i in range(points.shape[0]):
+        verts = []
+        for j in range(len(offsets)):
+            vert = bm.verts.new()
+            vert.co = points[i, :] + np.array(offsets[j]) * scale
+            verts.append(vert)
+        bm.faces.new(verts)
+
+    bm.to_mesh(instancer_mesh)
+
+    # instacer for point cloud
+    tmp_obj.parent = instancer
+    instancer.instance_type = 'FACES'
+
+    if len(sphere_color) > 4:
+
+        # add vertex color
+        vertex_color_name = instancer.name + '_col'
+        if not instancer_mesh.vertex_colors:
+            instancer_mesh.vertex_colors.new(name=vertex_color_name)
+        loops = instancer_mesh.loops
+
+        for loop_i, loop in enumerate(loops):
+            li = loop.index
+            instancer_mesh.vertex_colors[vertex_color_name].data[loop_i].color = sphere_color[int(loop_i/4)]
+
+        # add texture
+        mat = vertex_color_material(instancer, instancer.name, vertex_color_name)
+        nodes = mat.node_tree.nodes
+        image_node = nodes.new('ShaderNodeTexImage')
+        img = bpy.data.images.new( vertex_color_name, img_w, img_w )
+        image_node.image = img
+
+        # set render 
+        bpy.context.scene.render.engine = 'CYCLES'
+        bpy.context.scene.cycles.device = 'GPU'
+
+        # unwrap UV of the mesh
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.mesh.select_mode(type="FACE")
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.uv.smart_project()
+        # bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0)
+        bpy.ops.object.editmode_toggle()
+
+        # bake the coordinate to image
+        scene = bpy.context.scene
+        scene.cycles.bake_type = 'DIFFUSE'
+        scene.render.bake.use_pass_direct = False
+        scene.render.bake.use_pass_indirect = False
+        scene.render.bake.use_pass_color = True
+        scene.render.bake.use_clear = True
+        scene.render.bake.use_selected_to_active = False
+        scene.render.bake.target = 'IMAGE_TEXTURES'
+        scene.render.bake.margin = 0
+
+        bpy.context.view_layer.objects.active = instancer
+        bpy.ops.object.bake(type = 'DIFFUSE')
+    
+        # # add texture for tmp_obj
+        mat = vertex_color_material(tmp_obj, tmp_obj.name, vertex_color_name)
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        image_node = nodes.new('ShaderNodeTexImage')
+        image_node.image = img
         
-        template_sphere.cycles_visibility.diffuse = False
-        template_sphere.cycles_visibility.glossy = False
-        template_sphere.cycles_visibility.shadow = False
+        uv_node = nodes.new('ShaderNodeTexCoord')
+        diffuse_node = nodes['Diffuse BSDF']
+        links.new( uv_node.outputs['UV'], image_node.inputs['Vector'] )
+        links.new( image_node.outputs['Color'], diffuse_node.inputs['Color'] )
+        uv_node.from_instancer = True
+    else:
+        color_material(tmp_obj, tmp_obj.name, sphere_color)
 
-        self.instancers.append(instancer)
+    set_visible_property(instancer, False, False, False)
 
-    # Clear generated instancers (point spheres)
-    def clear_instancers(self):
-        active_object = bpy.context.active_object
-        active_object_name = active_object.name
-        active_object.select_set(False)
+    bm.free()
 
-        for instancer in self.instancers:
-            instancer.select_set(True)
-            for child in instancer.children:
-                child.select_set(True)
-
-        bpy.ops.object.delete()  # Delete selected objects
-        active_object = bpy.context.scene.objects[active_object_name]
-        active_object.select_set(True)
-
-    # Reselect active object
-    def post_process(self):
-        view_layer = bpy.context.view_layer
-        bpy.ops.object.select_all(action='DESELECT')
-        self.active_object.select_set(True)
-        view_layer.objects.active = self.active_object
-
-# Clear intermediate stuff
-def reset(pcm=None, clear_instancers=False, clear_database=False):
-    # start_time = time.time()
-
-    if (clear_instancers):
-        # Clear materials
-        for material in bpy.data.materials:
-            if ('Material' in material.name) or ('material' in material.name):
-                bpy.data.materials.remove(material)
-
-    if pcm != None:
-        pcm.clear_instancers()
-    if clear_database:
-        # Clear meshes
-        for mesh in bpy.data.meshes:
-            if (not 'Cube' in mesh.name) and (not 'Cone' in mesh.name) \
-                    and (not 'Cylinder' in mesh.name):
-                bpy.data.meshes.remove(mesh)
-
-        # Clear images
-        for image in bpy.data.images:
-            bpy.data.images.remove(image)
-    # print('reset time: ', time.time() - start_time)
+    return instancer    
 
 
 #=============================#
@@ -121,9 +150,9 @@ def reset(pcm=None, clear_instancers=False, clear_database=False):
 #=                           =#
 #=============================#
 
-def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
+def add_model( filename, obj_name, obj_pos, obj_rot, obj_color, obj_scale=1, \
         texture_path=None, normal_path=None, \
-        diffuse=False, glossy=False, shadow=True, use_auto_smooth=False ):
+        diffuse=False, glossy=False, shadow=True, use_auto_smooth=False, mat_name=None ):
     '''
     Args:
         filename: str
@@ -140,26 +169,18 @@ def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
         bpy.ops.import_scene.obj( filepath=filename )
     elif filename.endswith('ply'):
         bpy.ops.import_mesh.ply( filepath=filename )
+    elif filename.endswith('stl'):
+        bpy.ops.import_mesh.stl( filepath=filename )
     
-    name = filename.split('/')[-1].split('\\')[-1].split('.')[0][:10]
-
-    mesh = None
-    for obj in bpy.data.meshes:
-        if name in obj.name[:10]:
-            mesh = obj
-            break
-
-    for obj in bpy.context.scene.objects:
-        if obj.type == 'MESH':
-            if name == obj.name[:10]:
-                object = obj
-                break
-
-    if mesh is not None:
-        mesh.name = obj_name
+    object = bpy.context.selected_objects[0]
     object.name = obj_name
     object.rotation_mode = 'XYZ'
     object.rotation_euler = [0, 0, 0]
+    object.scale = [obj_scale, obj_scale, obj_scale]
+
+    mesh = object.data
+    if mesh is not None:
+        mesh.name = obj_name
 
     if obj_rot is not None:
         if len(obj_rot) == 3:
@@ -170,55 +191,26 @@ def add_model( filename, obj_name, obj_color, obj_pos, obj_rot, \
             object.rotation_mode = 'QUATERNION'
             object.rotation_quaternion = obj_rot
             object.location = obj_pos
-    
-    object.cycles_visibility.diffuse = diffuse
-    object.cycles_visibility.glossy = glossy
-    object.cycles_visibility.shadow = shadow
+
+    set_visible_property(object, diffuse, glossy, shadow)
 
     object.data.use_auto_smooth = use_auto_smooth
 
+    if mat_name is None:
+        mat_name = obj_name
+
     if texture_path is not None:
-        image_material(object, obj_name, obj_color, texture_path, normal_path)
-    else:
-        color_material(object, obj_name, obj_color)
+        image_material(object, mat_name, obj_color, texture_path, normal_path)
+    elif obj_color is not None:
+        color_material(object, mat_name, obj_color)
     return object
 
-def add_pointcloud( filename, obj_name, obj_pos, obj_scale, sphere_color, sphere_radius, pc_ids=[] ):
-    '''
-    Args:
-        filename: str
-        obj_name: str
-        sphere_color: list[float] [4] 
-            in [0,1]
-        sphere_radius: float
-    
-    Returns:
-        None
-    '''	
-    # Generate point cloud from file
-    pcm = PointCloudMaker()
-    if filename.endswith('obj'):
-        pcd = pcm.load_points(filename)
-    elif filename.endswith('ply'):
-        pcd = pcm.load_points(filename)
-    else:
-        pcd = pcm.generate_points_from_pts(filename)
-    
-    pcd[:,0] *= obj_scale[0]
-    pcd[:,1] *= obj_scale[1]
-    pcd[:,2] *= obj_scale[2]
 
-    pcd += np.array(obj_pos)
-    if len(pc_ids) > 0:
-        pcd = pcd[pc_ids]
-    
-    # Create spheres from point clouds
-    pcm.convert_to_spheres(points=pcd, name = obj_name, color=sphere_color, sphere_radius=sphere_radius)
 
-def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color, \
+def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8,0.8,1], \
         shape_setting=None, \
         texture_path=None, normal_path=None, \
-        diffuse=False, glossy=False, shadow=True ):
+        diffuse=False, glossy=False, shadow=True, mat_name=None ):
     '''
     Args:
         obj_type: str
@@ -227,6 +219,7 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color, \
             >>> 'cone'
             >>> 'plane'
             >>> 'cylinder'
+            >>> 'torus'
 
         obj_name: str
         obj_pos: list[float] [3]
@@ -240,83 +233,338 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color, \
     '''
     if obj_type == 'cylinder':
         bpy.ops.mesh.primitive_cylinder_add(vertices=shape_setting['vertices'])
+        init_name = 'Cylinder'
+
     elif obj_type == 'plane':
         bpy.ops.mesh.primitive_plane_add()
+        init_name = 'Plane'
+
     elif obj_type == 'cube':
         bpy.ops.mesh.primitive_cube_add()
+        init_name = 'Cube'
+
     elif obj_type == 'sphere':
-        bpy.ops.mesh.primitive_uv_sphere_add()
+        seg = 32
+        rings = 32
+        if shape_setting:
+            seg = shape_setting['segments']
+            rings = shape_setting['rings']
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=seg, ring_count=rings)
+        init_name = 'Sphere'
+        
     elif obj_type == 'cone':
         bpy.ops.mesh.primitive_cone_add(radius1=shape_setting['radius1'], radius2=shape_setting['radius2'], depth=shape_setting['depth'])
+        init_name = 'Cone'
 
+    elif obj_type == 'torus':
+        major_segments = 48
+        minor_segments = 8
+        minor_radius = 0.1
+        major_radius = 0.6
+        if shape_setting is not None:
+            if 'minor_segments' in shape_setting:
+                minor_segments = shape_setting['minor_segments']
+            if 'major_segments' in shape_setting:
+                major_segments = shape_setting['major_segments']
+            if 'minor_radius' in shape_setting:
+                minor_radius = shape_setting['minor_radius']
+            if 'major_radius' in shape_setting:
+                major_radius = shape_setting['major_radius']
+
+        bpy.ops.mesh.primitive_torus_add(
+            major_segments=major_segments,
+            minor_segments=minor_segments,
+            minor_radius=minor_radius,
+            major_radius=major_radius)
+
+        init_name = 'Torus'
+
+    for o in bpy.data.objects:
+        if o.name == init_name:
+            object = o
+            break
     object = bpy.context.active_object
+
     object.name = obj_name
+    
+    object.data.name = obj_name
+
     object.scale = obj_size
     object.rotation_mode = 'XYZ'
     object.rotation_euler= obj_rot
     object.location= obj_pos
-    
-    object.cycles_visibility.diffuse = diffuse
-    object.cycles_visibility.glossy = glossy
-    object.cycles_visibility.shadow = shadow
+
+    set_visible_property(object, diffuse, glossy, shadow)
+
+    if mat_name is None:
+        mat_name = obj_name
 
     if texture_path is not None:
-        image_material(object, obj_name, obj_color, texture_path, normal_path)
-    else:
-        color_material(object, obj_name, obj_color)
+        image_material(object, mat_name, obj_color, texture_path, normal_path)
+    elif obj_color is not None:
+        color_material(object, mat_name, obj_color)
+
     return object
 
-def add_line(start, end, width, color, with_arrow, name='arrow'):
-    start = np.array(start)
-    end = np.array(end)
-    cam_dir = end - start
-    length = np.linalg.norm(end-start)
+
+
+def add_axis(pos=[0,0,0], rot=[0,0,0], quat=None, width=0.02, length=0.5, name='origin'):
+    pos = np.array(pos)
+
+    if rot:
+        rot = np.array(rot)
+        mat = Rotation.from_euler('XYZ', rot).as_matrix()
+    elif quat:
+        quat = np.array(quat)
+        mat = Rotation.from_quat(quat).as_matrix()
+
+    mx = mat[:,0]
+    my = mat[:,1]
+    mz = mat[:,2]
     
-    if with_arrow:
-        cone = add_shape('cone', 'arrow_cone_' + name, end, vec_to_euler( -cam_dir ), [1,1,1], color,
-        {
-            'radius1': width,
-            'radius2': 0,
-            'depth': width*2,
-        }
-         )
+    x = add_curve(name + '_x', [pos, pos+mx * length], width, [0.8,0,0,1], end_radius=width*2, curve_style='x-x->' )
+    y = add_curve(name + '_y', [pos, pos+my * length], width, [0,0.8,0,1], end_radius=width*2, curve_style='x-x->' )
+    z = add_curve(name + '_z', [pos, pos+mz * length], width, [0,0,0.8,1], end_radius=width*2, curve_style='x-x->' )
+    return join_objects([x, y, z], name + '_axis')
 
-        # bpy.ops.mesh.primitive_cone_add(radius1=width, radius2=0, depth=width*2, \
-        # enter_editmode=False, align='WORLD', location=end, )
-        # cone = bpy.context.active_object
-        # cone.rotation_mode = 'XYZ'
-        # cone.rotation_euler = vec_to_euler( -cam_dir )
-        # cone.cycles_visibility.shadow = False
-        # cone.name = 'arrow_cone_' + name
-
-        # if len(color) == 3:
-        #     pure_color_material(cone, name, color )
-        # else:
-        #     color_material(cone, name, color )
+# code from 
+# https://blender.stackexchange.com/questions/153742/curve-from-a-set-of-points
+# very super cool 
+def add_curve_from_points( name, points, radius, color=[1,1,1,1], scale_factor = 1, radius_factor = 1, mat_name=None ):
     
-    cylinder = add_shape( 'cylinder', 'arrow_cylinder_' + name, (end+start)/2, vec_to_euler(cam_dir), [1,1,1], color, 
-    {
-        'vertices': 10
-    }
-      )
-    # bpy.ops.mesh.primitive_cylinder_add(radius=width/3, depth=length, \
-    #     enter_editmode=False, align='WORLD', location=(end+start)/2, )
-    # cylinder = bpy.context.active_object
+    # Set the points
+    verts = []
+    edges = []
+    for i in range(len(points)):
+        point = points[i]
 
-    # cylinder.rotation_mode = 'XYZ'
-    # cylinder.rotation_euler = vec_to_euler(cam_dir)
-    # cylinder.cycles_visibility.shadow = False
-    # cylinder.name = 'arrow_cylinder_' + name
+        verts.append( point * scale_factor )
+        if i < len(points)-1:
+            edges.append( (i, i+1) )
 
-    # if len(color) == 3:
-    #     pure_color_material(cylinder, name, color )
-    # else:
-    #     color_material(cylinder, name, color )
+    # Create a mesh
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, edges, [])
 
-    if with_arrow:
-        return [cylinder, cone]
-    else:
-        return cylinder
+    # Create an object with this mesh
+    obj = bpy.data.objects.new(name, mesh)
+    
+    # Add a subdivision surface (smooth the edges)
+    subdivision = obj.modifiers.new( "subdivision", 'SUBSURF' )
+    subdivision.render_levels = 1
+    subdivision.levels = 1
+
+    # Add a skin modifier in order to have thickness
+    skin = obj.modifiers.new( "skin", 'SKIN' )
+    skin.branch_smoothing = 0.5
+    skin.use_smooth_shade = True
+    
+    # Smooth again with another subdivision
+    subdivision = obj.modifiers.new( "subdivision2", 'SUBSURF' )
+    subdivision.render_levels = 2
+    subdivision.levels = 2
+    
+    # Associates the radius to each skin vertex
+    for i in range(len(points)):
+        s = obj.data.skin_vertices[''].data[i]
+        
+        if type(radius) != float:
+            r = radius[i]
+        else:
+            r = radius
+        rd = r * radius_factor
+        s.radius = (rd, rd)
+
+    # # Link object to the scene
+    bpy.context.scene.collection.objects.link(obj)
+    bpy.context.view_layer.objects.active = obj
+
+    bpy.ops.object.modifier_apply(modifier='subdivision')
+    bpy.ops.object.modifier_apply(modifier='skin')
+    bpy.ops.object.modifier_apply(modifier='subdivision2')
+
+
+    if mat_name is None:
+        mat_name = name
+
+    color_material(obj, mat_name, color)
+
+    return obj
+    
+def add_curve_from_points2(name, points, radius, color=[1,1,1,1], scale_factor = 1, radius_factor = 1, mat_name=None ):
+
+    # Create a curve with some bevel depth
+    curve = bpy.data.curves.new(name=name, type='CURVE')
+    curve.dimensions = '3D'
+    curve.bevel_depth = 1
+
+    # Create an object with it    
+    obj = bpy.data.objects.new(name, curve)
+
+    # Create a spline for each part
+    bezier_curve = curve.splines.new('BEZIER')
+    bezier_curve.bezier_points.add(len(points)-1)
+    
+    # Set the points
+    for i in range(len(points)):
+        bezier = bezier_curve.bezier_points[i]
+        point = points[i]
+
+        if type(radius) != float:
+            r = radius[i]
+        else:
+            r = radius
+        bezier.co = point * scale_factor
+        bezier.radius = r * radius_factor
+
+    # Link object to the scene
+    bpy.context.scene.collection.objects.link(obj)
+    # Toggle handle type (faster than doing it point by point)
+    obj.select_set( True )
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.editmode_toggle()
+    bpy.ops.curve.select_all(action='SELECT')
+    bpy.ops.curve.handle_type_set(type='AUTOMATIC')
+    bpy.ops.object.editmode_toggle()
+    bpy.ops.object.convert(target='MESH')
+
+    if mat_name is None:
+        mat_name = name
+
+    color_material(obj, mat_name, color)
+    
+    return obj
+
+def add_curve(name, points, radius, color=[1,1,1,1], scale_factor = 1, radius_factor = 1,\
+    curve_style='o-o-o', \
+    start_radius=None, end_radius=None, node_radius=None, \
+    node_gap = None, node_points=None, \
+    start_color=None, end_color=None, node_color=None, mat_name=None ):
+    
+    def curve_add_cone(insert_index, radius, mat_name, color=None):
+        
+        cone_pos = points[insert_index]
+        try:
+            if insert_index == -1 or insert_index == len(points)-1:
+                cone_dir = points[insert_index-1] - points[insert_index]
+            else:
+                rate = 0.5
+                # look_at = points[insert_index] * rate + points[insert_index+1] * (1-rate)
+                # cone_dir = points[insert_index-1] - look_at
+                cone_dir = points[insert_index-1] - points[insert_index+1]
+                cone_pos = points[insert_index] * rate +  (points[insert_index-1] + points[insert_index+1])/2 * (1 - rate)
+        except:
+            cone_dir = points[insert_index] - [0,0,0]
+
+        cone = add_shape('cone', name + '_%d' % (insert_index), cone_pos, vec_to_euler(cone_dir), [1,1,1], color,
+            {
+                'radius1': radius,
+                'radius2': 0,
+                'depth': radius*2,
+            }, mat_name=mat_name )
+        return cone
+    
+    def curve_add_sphere(insert_index, radius, mat_name, color=None):
+        sphere = add_shape('sphere', name + '_%d' % (insert_index), points[insert_index], [0]*3, [radius]*3, color, shadow=False, \
+                shape_setting={'segments': 40, 'rings': 40},  mat_name=mat_name )
+        return sphere
+    
+    def curve_add_node(insert_index, radius, anno_type, mat_name, color=None):
+        if anno_type in ['>']:
+            ret = curve_add_cone(insert_index, radius, mat_name, color)
+        elif anno_type in ['o', 'O', '0']:
+            ret = curve_add_sphere(insert_index, radius, mat_name, color)
+        else:
+            ret = None
+        return ret
+
+    def curve_union(curve, node, solver):
+        node_copy = node.copy()
+        node_copy.data = node.data.copy()
+        bpy.context.scene.collection.objects.link(node_copy)
+        
+        curve_copy = curve.copy()
+        curve_copy.data = curve.data.copy()
+        bpy.context.scene.collection.objects.link(curve_copy)
+
+        boolean_with(node, curve_copy, solver=solver)
+        boolean_with(curve, node_copy, solver=solver)
+
+        remove_object(node_copy, False)
+        remove_object(curve_copy, False)
+
+    if mat_name is None:
+        mat_name = name
+
+    all_list = []
+    if '-' in curve_style:
+        obj = add_curve_from_points(name, points, radius, color, scale_factor, radius_factor, mat_name=mat_name)
+        all_list.append(obj)
+    elif '~' in curve_style:
+        # BEZIER curve
+        obj = add_curve_from_points2(name, points, radius, color, scale_factor, radius_factor, mat_name=mat_name)
+        all_list.append(obj)
+    
+    start_style = curve_style[0]
+    if start_style == 'x':
+        start_radius = None
+
+    node_style = curve_style[2]
+    if node_style == 'x':
+        node_radius = None
+
+    end_style = curve_style[4]
+    if end_style == 'x':
+        end_radius = None
+
+    # insert node on curve
+    curve_nodes = []
+
+    node_list = []
+    if node_gap:
+        points_num = len(points)
+        end_len = points_num
+        points_list = np.array([ i for i in range(points_num) ])
+        points_list = points_list[node_gap:end_len]
+        node_list = points_list[::node_gap]
+    elif node_points:
+        for npos in node_points:
+            all_dist = np.linalg.norm( points - npos, axis=-1 )
+            node_list.append(np.argmin(all_dist))
+
+    if start_radius is not None:
+        if start_color is None:
+            start_color = color
+        start = curve_add_node(0, start_radius, start_style, mat_name + '_start', start_color)
+
+        curve_nodes.append(start)
+    
+    if node_style != 'x':
+        for i, insert_id in enumerate(node_list):
+            if node_color is None:
+                node_color = color
+
+            node = curve_add_node(insert_id, node_radius, node_style, mat_name, node_color)
+            curve_nodes.append(node)
+
+    if end_radius is not None:
+        if end_color is None:
+            end_color = color
+        end = curve_add_node(-1, end_radius, end_style, mat_name + '_end', end_color)
+
+        # curve_union(obj, end, 'EXACT')
+        curve_nodes.append(end)
+    
+    all_list += curve_nodes
+
+    if len(all_list) > 0: obj = join_objects( all_list, name )
+    else: obj = None
+
+    if obj:
+        set_visible_property(obj, False, False, False)
+
+    return obj
+
 
 def join_objects(objs, obj_name):
     '''
@@ -335,70 +583,55 @@ def join_objects(objs, obj_name):
     objs[0].name = obj_name
     return objs[0]
 
+
 #=============================#
 #=                           =#
 #=      Add model end        =#
 #=                           =#
 #=============================#
 
-
-def obj_border(object:bpy.context.object , width, obj_color):
-    """
-    Attention: really slow !!!
-    """
-
-    obj_name = object.name
-    
-    # obj_scale = object.scale
-    # obj_rot = object.rotation_euler
-    # obj_pos = object.location
-    # rot_mat = eulerAnglesToRotationMatrix(obj_rot)    
-    vertices = object.data.vertices
-
-    objs = []
-    for edge in object.data.edges:
-        v1 = vertices[ edge.vertices[0] ].co #* obj_scale
-        v2 = vertices[ edge.vertices[1] ].co #* obj_scale
-
-        vec = np.array(v1 - v2)
-        center = np.array((v1+v2)/2)
-        
-        lenght = np.linalg.norm(vec)
-
-        euler = vec_to_euler(vec)
-                
-        obj = add_cylinder(obj_name+"_edge", center, euler, [width, width, width + lenght/2], obj_color)
-        objs.append(obj)
-
-    c = {}
-    c["object"] = c["active_object"] = objs[0]
-    c["selected_objects"] = c["selected_editable_objects"] = objs
-    bpy.ops.object.join(c)
-    
-    objs[0].parent = object
-
-def ball_pc(radius, grid_num, ball_name, pos, sphere_color, sphere_radius=0.02):
-
-    ball = []
-
-    alpha_list = np.linspace(0, math.pi*2, grid_num+1)
-    beta_list = np.linspace(0, math.pi*2, grid_num+1)
-
-    for alpha in alpha_list:
-        for beta in beta_list:
-            x = math.cos(alpha) * math.cos(beta) * radius
-            y = math.sin(alpha) * math.cos(beta) * radius
-            z = math.sin(beta) * radius
-                
-            ball.append( [ x, y, z ] )
-        
-    ball = np.array(ball) + pos
-
-    pcm = PointCloudMaker()
-    pcm.convert_to_spheres(points=ball, \
-        name = ball_name, color=sphere_color, sphere_radius=sphere_radius)
+def remove_object(obj, remove_mat=True):
+    if remove_mat:
+        [ bpy.data.materials.remove(mat) for mat in obj.data.materials ]
+    data = obj.data
+    if data is not None:
+        if type(data) == bpy.types.Curve:
+            bpy.data.curves.remove(data)
+        elif type(data) == bpy.types.Mesh:
+            bpy.data.meshes.remove(data)
+    else:
+        bpy.data.objects.remove(obj)
 
 
+#----------------------------------------------
+# modifier begin
+#----------------------------------------------
+
+def boolean_with(obj_main, obj_with, operation_type="DIFFERENCE", solver='EXACT'):
+    # obj_main.select_set(True)
+    bpy.context.view_layer.objects.active = obj_main
+    b = obj_main.modifiers.new('Boolean', 'BOOLEAN')
+    # b.operation = 'INTERSECT'
+    b.operation = operation_type
+    b.object = obj_with
+    b.solver = solver
+
+    bpy.context.view_layer.objects.active = obj_main
+
+    bpy.ops.object.modifier_apply(modifier='Boolean')
+
+def subdivide(obj, levels=2):
+    subdivision = obj.modifiers.new( "sub", 'SUBSURF' )
+    subdivision.render_levels = levels
+    subdivision.levels = levels
+    bpy.ops.object.modifier_apply(modifier='sub')
+
+#----------------------------------------------
+# modifier end
+#----------------------------------------------
+
+
+# TODO
 class Voxel:
     '''
     voxel class
@@ -534,13 +767,4 @@ def object_bbox( obj ):
     #     if max_z < z: max_z = z
     return min_x, max_x, min_y, max_y, min_z, max_z
 
-
-# def color_obj_by_part(mesh_labels):
-#     for label in labels:
-#         mesh_color = hex_to_rgba(colors[label])
-#         # add materials
-#         object.data.materials.append( new_color_material( 'ibs_part_%d' % label, mesh_color, shadow_mode='NONE' ) ) 
-
-#     for polygon_idx, polygon in enumerate(object.data.polygons):
-#         polygon.material_index = mesh_labels[ polygon_idx ]
 
