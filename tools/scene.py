@@ -13,7 +13,7 @@ from inspect import getcallargs
 
 from scipy.spatial.transform import Rotation
 
-import models
+import tools.models as models
 
 color_map = {
     'purple': [0.503, 0.471, 0.965, 1],

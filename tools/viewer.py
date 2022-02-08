@@ -8,7 +8,7 @@ import bpy
 
 from scipy.spatial.transform import Rotation
 
-import transform
+import tools.transform
 
 def new_camera(name='Camera'):
     '''

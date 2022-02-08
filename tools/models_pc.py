@@ -7,15 +7,16 @@ import numpy as np
 import bpy
 import bmesh
 
+from space_view3d_point_cloud_visualizer import *
+
 from scipy.spatial.transform import Rotation
-import trimesh
 
-# dir = os.path.dirname(bpy.data.filepath)
-# if not dir in sys.path:
-#     sys.path.append(dir)
+dir = os.path.dirname(bpy.data.filepath)
+if not dir in sys.path:
+    sys.path.append(dir)
 
-from material import *
-from transform import *
+from tools.material import *
+from tools.transform import *
 # 
 def set_visible_property(object, diffuse=True, glossy=True, shadow=True):
     if bpy.app.version[0] == 3:
@@ -28,121 +29,275 @@ def set_visible_property(object, diffuse=True, glossy=True, shadow=True):
         object.cycles_visibility.shadow = shadow
 
 # https://github.com/itsumu/point_cloud_renderer
+class PointCloudMaker():
+    def __init__(self, active_object, type='ico_sphere'):
+        self.type = type
+        self.active_object = bpy.context.active_object
+        bpy.app.debug_value = 0
+        self.instancers = []
 
-def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj_scale=1 ):
+        self.controller = PCVControl(active_object)
 
-    if filename:
+    # Utility function to generate numpy points from ascii point cloud files
+    def generate_points_from_pts(self, filename):
+        points = np.loadtxt(filename)
+        return points
+
+    def load_points(self, filename):
+        # import open3d as o3d
+        # pc = o3d.io.read_point_cloud(filename)
+        # return np.array(pc.points)
+
+        import trimesh
         pc = trimesh.load_mesh(filename)
-        points = np.array(pc.vertices)
-    
-    points *= obj_scale
-    points += np.array(pos)
+        return np.array(pc.vertices)
 
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=sphere_radius)
-    tmp_obj = bpy.context.active_object
-    tmp_obj.name = name + "_tmp"
-    tmp_obj.data.name = name + "_tmp"
+    # Convert points to spheres
+    def convert_to_spheres(self, points=None, name='pc', color=[1,0,0,1], sphere_radius=0.01):
 
-    bpy.ops.mesh.primitive_plane_add()
-    instancer = bpy.context.active_object
-    instancer.name = name + "_point_cloud"
-    instancer_mesh = instancer.data
-    instancer_mesh.name = instancer.name
+        if self.type == 'ico_sphere':
+            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=sphere_radius)
+        elif self.type == 'cube':
+            bpy.ops.mesh.primitive_cube_add(size=sphere_radius)
+        template_sphere = bpy.context.active_object
+        template_sphere.name = name + "_pc"
 
-    # add face for each vertices
-    scale = 0.001
-    
-    img_w = (np.ceil(np.sqrt(len(points))) + 1) * 3
-    bm = bmesh.new()
+        uc_key = template_sphere.data.vertex_layers_float.new(name='uc')
+        num = len(uc_key.data)
+        for i, v in enumerate(uc_key.data):
+            v.value = i / num
 
-    offsets = [
-        [0, 1, 0],
-        [1, 1, 0],
-        [1, 0, 0],
-        [0, 0, 0],
-    ]
-
-    # new rectangular
-    for i in range(points.shape[0]):
-        verts = []
-        for j in range(len(offsets)):
+        bpy.ops.mesh.primitive_plane_add()
+        instancer = bpy.context.active_object
+        instancer.name = name + "_pc_parent"
+        instancer_mesh = instancer.data
+        bm = bmesh.new()
+        for i in range(points.shape[0]):
             vert = bm.verts.new()
-            vert.co = points[i, :] + np.array(offsets[j]) * scale
-            verts.append(vert)
-        bm.faces.new(verts)
+            vert.co = points[i, :]
 
-    bm.to_mesh(instancer_mesh)
+        uc_key = bm.verts.layers.float.new('uc')
+        num = len(bm.verts)
+        for i, v in enumerate(bm.verts):
+            v[uc_key] = i / num
 
-    # instacer for point cloud
-    tmp_obj.parent = instancer
-    instancer.instance_type = 'FACES'
+        bm.to_mesh(instancer_mesh)
 
-    if len(sphere_color) > 4:
+        uc_key = instancer.data.vertex_layers_float.new(name='uc')
+        template_sphere.parent = instancer
+        instancer.instance_type = 'VERTS'
 
-        # add vertex color
-        vertex_color_name = instancer.name + '_col'
-        if not instancer_mesh.vertex_colors:
-            instancer_mesh.vertex_colors.new(name=vertex_color_name)
-        loops = instancer_mesh.loops
+        if len(color) <= 4:
+            color_material(template_sphere, template_sphere.name, color=color, shadow_mode='NONE')
+        # if True:
+        else:
+            vcolors = template_sphere.data
+            
+            vertex_color_name = '%s_pc_col' % name
+            if not vcolors.vertex_colors:
+                vcolors.vertex_colors.new(name=vertex_color_name)
+                # [  vcolors.vertex_colors.remove(vc) for vc in vcolors.vertex_colors ]
+            
 
-        for loop_i, loop in enumerate(loops):
-            li = loop.index
-            instancer_mesh.vertex_colors[vertex_color_name].data[loop_i].color = sphere_color[int(loop_i/4)]
+            loops = vcolors.loops
 
-        # add texture
-        mat = vertex_color_material(instancer, instancer.name, vertex_color_name)
-        nodes = mat.node_tree.nodes
-        image_node = nodes.new('ShaderNodeTexImage')
-        img = bpy.data.images.new( vertex_color_name, img_w, img_w )
-        image_node.image = img
+            if self.type == 'ico_sphere':
+                num = 642
+            elif self.type == 'cube':
+                num = 8
 
-        # set render 
-        bpy.context.scene.render.engine = 'CYCLES'
-        bpy.context.scene.cycles.device = 'GPU'
+            max_vi = 0
+            for loop_i, loop in enumerate(loops):
+                vi = loop.vertex_index
+                li = loop.index
+                
+                if max_vi < vi: max_vi = vi
+                
+                c = color[vi]
 
-        # unwrap UV of the mesh
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.mesh.select_mode(type="FACE")
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.uv.smart_project()
-        # bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0)
-        bpy.ops.object.editmode_toggle()
+                vcolors.vertex_colors[vertex_color_name].data[loop_i].color = c
 
-        # bake the coordinate to image
-        scene = bpy.context.scene
-        scene.cycles.bake_type = 'DIFFUSE'
-        scene.render.bake.use_pass_direct = False
-        scene.render.bake.use_pass_indirect = False
-        scene.render.bake.use_pass_color = True
-        scene.render.bake.use_clear = True
-        scene.render.bake.use_selected_to_active = False
-        scene.render.bake.target = 'IMAGE_TEXTURES'
-        scene.render.bake.margin = 0
-
-        bpy.context.view_layer.objects.active = instancer
-        bpy.ops.object.bake(type = 'DIFFUSE')
-    
-        # # add texture for tmp_obj
-        mat = vertex_color_material(tmp_obj, tmp_obj.name, vertex_color_name)
-        nodes = mat.node_tree.nodes
-        links = mat.node_tree.links
-        image_node = nodes.new('ShaderNodeTexImage')
-        image_node.image = img
+            rgb_color_material(template_sphere, template_sphere.name, vertex_color_name)
         
-        uv_node = nodes.new('ShaderNodeTexCoord')
-        diffuse_node = nodes['Diffuse BSDF']
-        links.new( uv_node.outputs['UV'], image_node.inputs['Vector'] )
-        links.new( image_node.outputs['Color'], diffuse_node.inputs['Color'] )
-        uv_node.from_instancer = True
+        set_visible_property(template_sphere, False, False, False)
+        self.instancers.append(instancer)
+        bm.free()
+        return instancer
+
+    # Points should be generated first
+    def convert_to_sphere_rgb(self, object_name, mesh_size):
+        # start_time = time.time()
+
+        if not object_name:
+            object_name = self.object_name
+
+        pcv = self.active_object.point_cloud_visualizer
+        pcv.filepath = object_name + '.pts' # Used for object id
+        # pcv.filepath = filename
+
+        pcv.mesh_size = mesh_size
+        pcv.mesh_type = 'INSTANCER'
+        pcv.mesh_base_sphere_subdivisions = 4
+        bpy.ops.point_cloud_visualizer.convert()
+
+        # Rotate to normal pose
+        target_name = '{}-instancer'.format(object_name)
+        pc = bpy.data.objects[target_name]
+        set_visible_property(pc, False, False, False)
+        target = bpy.data.objects['Icosphere']
+        set_visible_property(target, False, False, False)
+
+        return pc
+
+
+    def draw(self, points, colors):
+        self.controller.draw(vs=points, cs=colors)
+
+
+    # Convert points to spheres
+    def convert_to_spheres_old(self, points=None, name='pc', color=[1,0,0,1], sphere_radius=0.01):
+        # start_time = time.time()
+
+        if self.type == 'ico_sphere':
+            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=sphere_radius)
+        elif self.type == 'cube':
+            bpy.ops.mesh.primitive_cube_add(size=sphere_radius)
+        template_sphere = bpy.context.active_object
+        template_sphere.name = name + "_pc"
+
+        bpy.ops.mesh.primitive_plane_add()
+        instancer = bpy.context.active_object
+        instancer.name = name + "_pc_parent"
+        instancer_mesh = instancer.data
+        bm = bmesh.new()
+        for i in range(points.shape[0]):
+            bm.verts.new().co = points[i, :]
+        bm.to_mesh(instancer_mesh)
+        template_sphere.parent = instancer
+        instancer.instance_type = 'VERTS'
+        color_material(template_sphere, template_sphere.name, color=color, shadow_mode='NONE')
+
+        # display shadow on cycles mode
+        
+        set_visible_property(template_sphere, False, False, False)
+
+
+        self.instancers.append(instancer)
+
+    # Clear generated instancers (point spheres)
+    def clear_instancers(self):
+        active_object = bpy.context.active_object
+        active_object_name = active_object.name
+        active_object.select_set(False)
+
+        for instancer in self.instancers:
+            instancer.select_set(True)
+            for child in instancer.children:
+                child.select_set(True)
+
+        bpy.ops.object.delete()  # Delete selected objects
+        active_object = bpy.context.scene.objects[active_object_name]
+        active_object.select_set(True)
+
+    # Reselect active object
+    def post_process(self):
+        view_layer = bpy.context.view_layer
+        bpy.ops.object.select_all(action='DESELECT')
+        self.active_object.select_set(True)
+        view_layer.objects.active = self.active_object
+
+
+# Clear intermediate stuff
+def reset(pcv_controller=None, clear_instancers=False, clear_database=False):
+    #start_time = time.time()
+
+    if pcv_controller != None:
+        pcv_controller.reset()
+    if (clear_instancers):
+        # Clear materials
+        for material in bpy.data.materials:
+            if 'PCParticles' in material.name or 'material' in material.name or 'Material' in material.name:
+                bpy.data.materials.remove(material)
+        # Delete previously created instancers
+        def delete_hierarchy(obj):
+            for child in obj.children:
+                delete_hierarchy(child)
+            obj.select_set(True)
+            bpy.ops.object.delete()
+
+        active_object = bpy.context.active_object
+        for object in bpy.data.objects:
+            if '-instancer' in object.name:
+                active_target_name = str(active_object.name)
+                active_object.select_set(False)
+                delete_hierarchy(object)
+                active_object = bpy.data.objects[active_target_name]
+
+    
+    if clear_database:
+        # Clear meshes
+        for mesh in bpy.data.meshes:
+            if (not 'Cube' in mesh.name) and (not 'Cone' in mesh.name) \
+                    and (not 'Cylinder' in mesh.name):
+                bpy.data.meshes.remove(mesh)
+            
+        # Clear images
+        for image in bpy.data.images:
+            bpy.data.images.remove(image)
+
+
+
+# code from https://github.com/ianhuang0630/blender_render
+def pc_rgb( pc_name, points, colors, obj_pos, obj_scale, point_radius=0.01, \
+    diffuse=False, glossy=False, shadow=False ):
+
+    points *= obj_scale
+    points += obj_pos
+
+    sphere_mesh = bpy.data.meshes.new('sphere')
+    sphere_bmesh = bmesh.new()
+
+    if bpy.app.version[0] == 3:
+        bmesh.ops.create_icosphere(sphere_bmesh, subdivisions=1, radius=point_radius)
     else:
-        color_material(tmp_obj, tmp_obj.name, sphere_color)
+        bmesh.ops.create_icosphere(sphere_bmesh, subdivisions=2, diameter=point_radius*2)
+    
+    sphere_bmesh.to_mesh(sphere_mesh)
+    sphere_bmesh.free()
+    
+    sphere_verts = np.array([[v.co.x, v.co.y, v.co.z] for v in sphere_mesh.vertices])
+    sphere_faces = np.array([[p.vertices[0], p.vertices[1], p.vertices[2]] for p in sphere_mesh.polygons])
+    # 
+    verts = (np.expand_dims(sphere_verts, axis=0) + np.expand_dims(points, axis=1)).reshape(-1, 3)
+    faces = (np.expand_dims(sphere_faces, axis=0) + (np.arange(points.shape[0]) * sphere_verts.shape[0]).reshape(-1, 1, 1)).reshape(-1, 3)
 
-    set_visible_property(instancer, False, False, False)
+    vert_colors = np.repeat(colors, sphere_verts.shape[0], axis=0).astype(dtype='float64')
+    vert_colors = vert_colors[faces.reshape(-1), :]
+    # 
+    verts[:, 2] -= verts.min(axis=0)[2]
+    # 
+    verts = verts.tolist()
+    faces = faces.tolist()
+    vert_colors = vert_colors.tolist()
+    # 
+    mesh = bpy.data.meshes.new(pc_name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.validate()
 
-    bm.free()
+    vertex_color_name = pc_name + '_Col'
+    mesh.vertex_colors.new(name= vertex_color_name)
+    mesh_vert_colors = mesh.vertex_colors[ vertex_color_name]
+    
+    for i, c in enumerate(mesh_vert_colors.data):
+        c.color = vert_colors[i]  + [1.0]
 
-    return instancer    
+    obj = bpy.data.objects.new(pc_name, mesh)
+    bpy.context.collection.objects.link(obj)
 
+    # add material
+    vertex_color_material(obj, pc_name, vertex_color_name )
+    
+    set_visible_property(obj, diffuse, glossy, shadow)
 
 #=============================#
 #=                           =#
@@ -205,6 +360,77 @@ def add_model( filename, obj_name, obj_pos, obj_rot, obj_color, obj_scale=1, \
         color_material(object, mat_name, obj_color)
     return object
 
+def add_pointcloud( filename, obj_name, obj_pos, sphere_color, sphere_radius, obj_scale=1 ):
+    '''
+    Args:
+        filename: str
+        obj_name: str
+        sphere_color: list[float] [4] 
+            in [0,1]
+        sphere_radius: float
+    
+    Returns:
+        None
+    '''	
+    # Generate point cloud from file
+    pcm = PointCloudMaker(bpy.context.active_object)
+    
+    if filename.endswith('obj'):
+        pcd = pcm.load_points(filename)
+    elif filename.endswith('ply'):
+        pcd = pcm.load_points(filename)
+    else:
+        pcd = pcm.generate_points_from_pts(filename)
+    
+    pcd *= obj_scale
+
+    pcd += np.array(obj_pos)
+    
+    # Create spheres from point clouds
+    return pcm.convert_to_spheres(points=pcd, name = obj_name, color=sphere_color, sphere_radius=sphere_radius)
+
+
+def draw_pointcloud( filename, obj_name, obj_pos, sphere_colors, sphere_radius, obj_scale=1 ):
+    '''
+    Args:
+        filename: str
+        obj_name: str
+        sphere_colors: list[float] [n x 4] 
+            in [0,1]
+        sphere_radius: float
+    
+    Returns:
+        None
+    '''	
+    # Generate point cloud from file
+    bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+
+    active_object = bpy.context.active_object
+    active_object.name = obj_name + '_EMPTY'
+    
+    # Generate point cloud from file
+    pcm = PointCloudMaker(active_object)
+
+    # pcm.controller.reset()
+    reset(pcv_controller=pcm.controller, clear_instancers=True)
+    
+    if filename.endswith('obj'):
+        pcd = pcm.load_points(filename)
+    elif filename.endswith('ply'):
+        pcd = pcm.load_points(filename)
+    else:
+        pcd = pcm.generate_points_from_pts(filename)
+    
+    pcd *= obj_scale
+
+    pcd += np.array(obj_pos)
+    
+    # Create spheres from point clouds
+    pcm.draw(points=pcd, colors=sphere_colors )
+    ret = pcm.convert_to_sphere_rgb(obj_name, sphere_radius)
+    pcm.post_process()
+
+    return ret
 
 
 def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8,0.8,1], \
@@ -307,6 +533,35 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8
     return object
 
 
+def add_line(start, end, width, color, with_arrow, name='arrow'):
+    start = np.array(start)
+    end = np.array(end)
+    cam_dir = end - start
+    length = np.linalg.norm(end-start)
+    
+    if with_arrow:
+        cone = add_shape('cone', 'arrow_cone_' + name, end, vec_to_euler(-cam_dir), [1,1,1], None,
+        {
+            'radius1': width,
+            'radius2': 0,
+            'depth': width*2,
+        } )
+    
+    center = (end+start)/2
+    
+    
+    cylinder = add_shape( 'cylinder', 'arrow_cylinder_' + name, center, \
+        vec_to_euler(cam_dir), [width*0.4, width*0.4, length/2 - width/2 ], None,  { 'vertices': 10 } )
+
+    if with_arrow:
+        objects = [cylinder, cone]
+    else:
+        objects = [cylinder]
+
+    obj = join_objects(objects, name)
+
+    mat_name = 'arrow_' + name
+    color_material(obj, mat_name, color)
 
 def add_axis(pos=[0,0,0], rot=[0,0,0], quat=None, width=0.02, length=0.5, name='origin'):
     pos = np.array(pos)
@@ -322,6 +577,10 @@ def add_axis(pos=[0,0,0], rot=[0,0,0], quat=None, width=0.02, length=0.5, name='
     my = mat[:,1]
     mz = mat[:,2]
     
+    # add_line( pos, pos+mx * length, width, [0.8,0,0,1], True, name + '_x' )
+    # add_line( pos, pos+my * length, width, [0,0.8,0,1], True, name + '_y' )
+    # add_line( pos, pos+mz * length, width, [0,0,0.8,1], True, name + '_z' )
+
     x = add_curve(name + '_x', [pos, pos+mx * length], width, [0.8,0,0,1], end_radius=width*2, curve_style='x-x->' )
     y = add_curve(name + '_y', [pos, pos+my * length], width, [0,0.8,0,1], end_radius=width*2, curve_style='x-x->' )
     z = add_curve(name + '_z', [pos, pos+mz * length], width, [0,0,0.8,1], end_radius=width*2, curve_style='x-x->' )
@@ -631,7 +890,64 @@ def subdivide(obj, levels=2):
 #----------------------------------------------
 
 
-# TODO
+def obj_border(object:bpy.context.object , width, obj_color):
+    """
+    Attention: really slow !!!
+    """
+
+    obj_name = object.name
+    
+    # obj_scale = object.scale
+    # obj_rot = object.rotation_euler
+    # obj_pos = object.location
+    # rot_mat = eulerAnglesToRotationMatrix(obj_rot)    
+    vertices = object.data.vertices
+
+    objs = []
+    for edge in object.data.edges:
+        v1 = vertices[ edge.vertices[0] ].co #* obj_scale
+        v2 = vertices[ edge.vertices[1] ].co #* obj_scale
+
+        vec = np.array(v1 - v2)
+        center = np.array((v1+v2)/2)
+        
+        lenght = np.linalg.norm(vec)
+
+        euler = vec_to_euler(vec)
+                
+        obj = add_shape( 'cylinder', obj_name+"_edge", center, euler, [width, width, width + lenght/2], obj_color,  { 'vertices': 10 } )
+        
+        objs.append(obj)
+
+    c = {}
+    c["object"] = c["active_object"] = objs[0]
+    c["selected_objects"] = c["selected_editable_objects"] = objs
+    bpy.ops.object.join(c)
+    
+    objs[0].parent = object
+
+def ball_pc(radius, grid_num, ball_name, pos, sphere_color, sphere_radius=0.02):
+
+    ball = []
+
+    alpha_list = np.linspace(0, math.pi*2, grid_num+1)
+    beta_list = np.linspace(0, math.pi*2, grid_num+1)
+
+    for alpha in alpha_list:
+        for beta in beta_list:
+            x = math.cos(alpha) * math.cos(beta) * radius
+            y = math.sin(alpha) * math.cos(beta) * radius
+            z = math.sin(beta) * radius
+                
+            ball.append( [ x, y, z ] )
+        
+    ball = np.array(ball) + pos
+
+    pcm = PointCloudMaker()
+    pcm.convert_to_spheres(points=ball, \
+        name = ball_name, color=sphere_color, sphere_radius=sphere_radius)
+
+
 class Voxel:
     '''
     voxel class

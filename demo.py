@@ -18,12 +18,12 @@ sys.path.append(ROOT_DIR)
 
 import importlib
 
-import render
-import material
-import models
-import lighter
-import viewer
-import scene
+from tools import render
+from tools import material
+from tools import models
+from tools import lighter
+from tools import viewer
+from tools import scene
 
 importlib.reload(render)
 importlib.reload(material)
