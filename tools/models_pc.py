@@ -246,6 +246,117 @@ def reset(pcv_controller=None, clear_instancers=False, clear_database=False):
             bpy.data.images.remove(image)
 
 
+# https://b3d.interplanety.org/en/how-to-create-a-new-mesh-uv-with-the-blender-python-api/
+def add_pointcloud2(filename, name, pos, sphere_color, sphere_radius, obj_scale=1 ):
+    import trimesh
+    if filename:
+        pc = trimesh.load_mesh(filename)
+        points = np.array(pc.vertices)
+    
+    points *= obj_scale
+    points += np.array(pos)
+
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=sphere_radius)
+    tmp_obj = bpy.context.active_object
+    tmp_obj.name = name + "_tmp"
+    tmp_obj.data.name = name + "_tmp"
+
+    bpy.ops.mesh.primitive_plane_add()
+    instancer = bpy.context.active_object
+    instancer.name = name + "_point_cloud"
+    instancer_mesh = instancer.data
+    instancer_mesh.name = instancer.name
+
+    # add face for each vertices
+    scale = sphere_radius / 2
+    
+    img_w = int(np.ceil(np.sqrt(len(points))) + 1)
+    bm = bmesh.new()
+
+    offsets = [
+        [1, 1, 0],
+        [1, -1, 0],
+        [-1, -1, 0],
+        [-1, 1, 0],
+    ]
+    offsets = [
+        [0, 1, 0],
+        [math.sqrt(3)/2, -0.5, 0],
+        [-math.sqrt(3)/2, -0.5, 0],
+    ]
+
+    # new rectangular
+    for i in range(points.shape[0]):
+        verts = []
+        for j in range(len(offsets)):
+            vert = bm.verts.new()
+            vert.co = points[i, :] + np.array(offsets[j]) * scale
+            verts.append(vert)
+        bm.faces.new(verts)
+
+    bm.to_mesh(instancer_mesh)
+
+    # instacer for point cloud
+    tmp_obj.parent = instancer
+    instancer.instance_type = 'FACES'
+
+    if len(sphere_color) > 4:
+
+        # add vertex color
+        vertex_color_name = instancer.name + '_col'
+        if not instancer_mesh.vertex_colors:
+            instancer_mesh.vertex_colors.new(name=vertex_color_name)
+        loops = instancer_mesh.loops
+
+        for loop_i, loop in enumerate(loops):
+            instancer_mesh.vertex_colors[vertex_color_name].data[loop_i].color = sphere_color[int(loop_i/3)]
+
+        # add texture
+        mat = vertex_color_material(instancer, instancer.name, vertex_color_name)
+        nodes = mat.node_tree.nodes
+        image_node = nodes.new('ShaderNodeTexImage')
+        img = bpy.data.images.new( vertex_color_name, img_w, img_w )
+        image_node.image = img
+
+        # set render 
+        bpy.context.scene.render.engine = 'CYCLES'
+        bpy.context.scene.cycles.device = 'GPU'
+
+        # unwrap UV of the mesh
+        uv_name = vertex_color_name
+        new_uv = instancer.data.uv_layers.new(name=uv_name)
+        for loop in bpy.context.active_object.data.loops:
+            loop_i = loop.index
+            point_index = int(loop_i/3)
+            x = (int(point_index / img_w) + 0.5) / (img_w * 1.0)
+            y = (point_index % img_w + 0.5) / (img_w * 1.0)
+
+            new_uv.data[loop_i].uv = ( y, x )
+        
+        colors = list(np.zeros( img_w * img_w * 4 ))
+        colors[ :len(sphere_color)*4 ] = sphere_color.flatten()
+        img.pixels.foreach_set(colors)
+
+        # # add texture for tmp_obj
+        mat = vertex_color_material(tmp_obj, tmp_obj.name, vertex_color_name)
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        image_node = nodes.new('ShaderNodeTexImage')
+        image_node.image = img
+        
+        uv_node = nodes.new('ShaderNodeTexCoord')
+        diffuse_node = nodes['Diffuse BSDF']
+        links.new( uv_node.outputs['UV'], image_node.inputs['Vector'] )
+        links.new( image_node.outputs['Color'], diffuse_node.inputs['Color'] )
+        uv_node.from_instancer = True
+    else:
+        color_material(tmp_obj, tmp_obj.name, sphere_color)
+
+    set_visible_property(instancer, False, False, False)
+
+    bm.free()
+
+    return instancer
 
 # code from https://github.com/ianhuang0630/blender_render
 def pc_rgb( pc_name, points, colors, obj_pos, obj_scale, point_radius=0.01, \

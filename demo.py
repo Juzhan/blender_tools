@@ -32,6 +32,15 @@ importlib.reload(lighter)
 importlib.reload(viewer)
 importlib.reload(scene)
 
+def color_from_height( points ):
+    z = points[:, 2].copy()
+    min_z = np.min(z)
+    max_z = np.max(z)
+    z = (z-min_z) / (max_z - min_z)
+    colors = material.get_cmap_color( z, cmap_type='jet')
+    return colors
+
+
 def main():
     # clean all object
     scene.clear_all()
@@ -62,15 +71,20 @@ def main():
         texture_path=os.path.join(DATA_DIR, "model/banana/texture_map.png")
     )
 
-    cube = models.add_shape("cube", 'cube', [0, 0.25, 0.2], [0,0,np.deg2rad(-45)], [0.07,0.03,0.03], [0,0,0,1], 
+    cube = models.add_shape("cube", 'cube', [0, 0.25, 0.25], [0,0,np.deg2rad(-45)], [0.07,0.03,0.03], [0,0,0,1], 
         texture_path=os.path.join(DATA_DIR, "texture/castle_brick_02_red_2k_jpg/castle_brick_02_red_ao_2k.jpg"),
         normal_path=os.path.join(DATA_DIR, "texture/castle_brick_02_red_2k_jpg/castle_brick_02_red_nor_2k.jpg")
         )
+
+    cube2 = models.add_shape("cube", 'cube2', [0, 0.25, 0.1], [0,0,np.deg2rad(-45)], [0.07,0.03,0.03], [0,0,0,1],)
+    cube_vert_colors = [ material.pure_colors[i] for i in [0,0,1,1,2,2,3,3] ]
+    material.set_vertex_color(cube2, cube_vert_colors, 'cube2_vert')
+    material.vertex_color_material(cube2, 'cube2_mat', 'cube2_vert')
+
     # add axis
-    cube_axis = models.add_axis(name='cube', pos=cube.location, rot=cube.rotation_euler, width=0.004, length=0.13 )
+    cube_axis = models.add_axis(name='cube', pos=cube.location, rot=cube.rotation_euler, width=0.004, length=0.1 )
     scene.move_obj_to_collection(cube_axis, 'Object')
     
-
     scene.switch_to_collection('PC')
     
     pointcloud = models.add_pointcloud(
@@ -79,18 +93,13 @@ def main():
         "pc",
         [0, -0.2, 0.1], [0.2, 0.4, 1, 1], 0.001, 0.05 )
     
-    pc = trimesh.load_mesh(os.path.join(DATA_DIR, "model/ycb_072-a_toy_airplane_scaled/ycb_072-a_toy_airplane_scaled.ply"))
+    pc = trimesh.load_mesh( os.path.join(DATA_DIR, "model/ycb_072-a_toy_airplane_scaled/ycb_072-a_toy_airplane_scaled.ply") )
     points = np.array(pc.vertices)
-    z = points[:, 2].copy()
-    min_z = np.min(z)
-    max_z = np.max(z)
-    z = (z-min_z) / (max_z - min_z)
-    colors = material.get_cmap_color( z, cmap_type='jet')
-
+    colors = color_from_height(points)
     pointcloud2 = models.add_pointcloud(
+        os.path.join(DATA_DIR, "model/ycb_072-a_toy_airplane_scaled/ycb_072-a_toy_airplane_scaled.ply"),
         None,
-        points,
-        "pc",
+        "pc2",
         [0, -0.4, 0.1], colors, 0.001, 0.05 )
 
     curve = scene.add_path(
@@ -98,7 +107,7 @@ def main():
     )
 
     # render
-    render.do_render( os.path.join(ROOT_DIR, "./demo.png") )
+    render.do_render( os.path.join(ROOT_DIR, "./env_data/page.png") )
 
 if __name__ == '__main__':
     main()

@@ -11,13 +11,14 @@ colors = [ "#ffffff",  "#9075de", "#e55953", "#e28678", "#dbcc7b", "#9dc756", "#
 colors = [ "#FBB5AF", "#FBE06F", "#B0E586", "#8AD4D5", "#718DD5", "#A38DDE", "#9ED68C", "#61abff", "#ffb056", '#A9CBFF' ]
 
 pure_colors = [ 
-    [1,1,1, 0.5],
-    [0,1,0, 0.5],
-    [0,0,1, 0.5],
-    [1,1,0, 0.5],
-    [1,0,1, 0.5],
-    [0,1,1, 0.5],
-    [0,0.3,0.8, 0.5],
+    [1,1,1, 1],
+    [0,1,0, 1],
+    [0,0,1, 1],
+    [1,1,0, 1],
+    [1,0,1, 1],
+    [0,1,1, 1],
+    [0,0.3,0.8,1],
+    [0,0,0,1],
 ]
 
 def srgb_to_linearrgb(c):
@@ -274,6 +275,24 @@ def new_pure_color_material( mat_name, color, shadow_mode="NONE"):
     mat.shadow_method = shadow_mode
 
     return mat
+
+
+def set_vertex_color(obj, vertex_colors, vertex_color_name):
+    vertex_colors = np.array(vertex_colors)
+
+    mesh = obj.data
+
+    # add vertex color
+    if not mesh.vertex_colors:
+        mesh.vertex_colors.new(name=vertex_color_name)
+    
+    mloops = np.zeros((len(mesh.loops)), dtype=np.int)
+    mesh.loops.foreach_get("vertex_index", mloops)
+    
+    # st color for each loop 
+    colors = vertex_colors[np.array(mloops)]
+    colors = colors.flatten()
+    mesh.vertex_colors[vertex_color_name].data.foreach_set("color", colors)
 
 def vertex_color_material( object, mat_name, vertex_color_name):
     '''

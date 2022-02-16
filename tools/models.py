@@ -27,8 +27,24 @@ def set_visible_property(object, diffuse=True, glossy=True, shadow=True):
         object.cycles_visibility.glossy = glossy
         object.cycles_visibility.shadow = shadow
 
-# https://github.com/itsumu/point_cloud_renderer
+def read_verts(mesh):
+    mverts_co = np.zeros((len(mesh.vertices)*3), dtype=np.float)
+    mesh.vertices.foreach_get("co", mverts_co)
+    return np.reshape(mverts_co, (len(mesh.vertices), 3))      
 
+def read_edges(mesh):
+    fastedges = np.zeros((len(mesh.edges)*2), dtype=np.int) # [0.0, 0.0] * len(mesh.edges)
+    mesh.edges.foreach_get("vertices", fastedges)
+    return np.reshape(fastedges, (len(mesh.edges), 2))
+
+def read_norms(mesh):
+    mverts_no = np.zeros((len(mesh.vertices)*3), dtype=np.float)
+    mesh.vertices.foreach_get("normal", mverts_no)
+    return np.reshape(mverts_no, (len(mesh.vertices), 3))
+
+
+# https://github.com/itsumu/point_cloud_renderer
+# https://b3d.interplanety.org/en/how-to-create-a-new-mesh-uv-with-the-blender-python-api/
 def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj_scale=1 ):
 
     if filename:
@@ -50,16 +66,21 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
     instancer_mesh.name = instancer.name
 
     # add face for each vertices
-    scale = 0.001
+    scale = sphere_radius / 2
     
-    img_w = (np.ceil(np.sqrt(len(points))) + 1) * 3
+    img_w = int(np.ceil(np.sqrt(len(points))) + 1)
     bm = bmesh.new()
 
     offsets = [
-        [0, 1, 0],
         [1, 1, 0],
-        [1, 0, 0],
-        [0, 0, 0],
+        [1, -1, 0],
+        [-1, -1, 0],
+        [-1, 1, 0],
+    ]
+    offsets = [
+        [0, 1, 0],
+        [math.sqrt(3)/2, -0.5, 0],
+        [-math.sqrt(3)/2, -0.5, 0],
     ]
 
     # new rectangular
@@ -86,8 +107,7 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
         loops = instancer_mesh.loops
 
         for loop_i, loop in enumerate(loops):
-            li = loop.index
-            instancer_mesh.vertex_colors[vertex_color_name].data[loop_i].color = sphere_color[int(loop_i/4)]
+            instancer_mesh.vertex_colors[vertex_color_name].data[loop_i].color = sphere_color[int(loop_i/3)]
 
         # add texture
         mat = vertex_color_material(instancer, instancer.name, vertex_color_name)
@@ -101,27 +121,20 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
         bpy.context.scene.cycles.device = 'GPU'
 
         # unwrap UV of the mesh
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.mesh.select_mode(type="FACE")
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.uv.smart_project()
-        # bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0)
-        bpy.ops.object.editmode_toggle()
+        # each face use 1 pixel
+        uv_name = vertex_color_name
+        new_uv = instancer.data.uv_layers.new(name=uv_name)
+        for loop in bpy.context.active_object.data.loops:
+            loop_i = loop.index
+            point_index = int(loop_i/3)
+            x = (int(point_index / img_w) + 0.5) / (img_w * 1.0)
+            y = (point_index % img_w + 0.5) / (img_w * 1.0)
+            new_uv.data[loop_i].uv = ( y, x )
 
-        # bake the coordinate to image
-        scene = bpy.context.scene
-        scene.cycles.bake_type = 'DIFFUSE'
-        scene.render.bake.use_pass_direct = False
-        scene.render.bake.use_pass_indirect = False
-        scene.render.bake.use_pass_color = True
-        scene.render.bake.use_clear = True
-        scene.render.bake.use_selected_to_active = False
-        scene.render.bake.target = 'IMAGE_TEXTURES'
-        scene.render.bake.margin = 0
+        colors = list(np.zeros( img_w * img_w * 4 ))
+        colors[ :len(sphere_color)*4 ] = sphere_color.flatten()
+        img.pixels.foreach_set(colors)
 
-        bpy.context.view_layer.objects.active = instancer
-        bpy.ops.object.bake(type = 'DIFFUSE')
-    
         # # add texture for tmp_obj
         mat = vertex_color_material(tmp_obj, tmp_obj.name, vertex_color_name)
         nodes = mat.node_tree.nodes
@@ -141,8 +154,7 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
 
     bm.free()
 
-    return instancer    
-
+    return instancer
 
 #=============================#
 #=                           =#

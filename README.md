@@ -9,6 +9,9 @@ Just some simple function to load models and render the scene
 support Blender 2.8+, 2.9+, 3.0+
 
 ## Update note
+> 2022.02.17
+1. update rgb point cloud (very good, faster than point_cloud_visualizer addon !!!)
+2. color the object surface based on vertex colors
 > 2022.02.08
 1. add collection management
 2. add curve
@@ -39,4 +42,11 @@ blender -b -P demo.py
 ```
 
 ## Acknowledgements
-Learn from [bpycv](https://github.com/DIYer22/bpycv) and [point_cloud_render](https://github.com/itsumu/point_cloud_renderer) and [point_cloud_visualizer](https://github.com/uhlik/bpy)
+Learn from 
+* [bpycv](https://github.com/DIYer22/bpycv)
+* [point_cloud_render](https://github.com/itsumu/point_cloud_renderer)
+* [point_cloud_visualizer](https://github.com/uhlik/bpy)
+
+and thanks to these blogs:
+* [create uv map](https://b3d.interplanety.org/en/how-to-create-a-new-mesh-uv-with-the-blender-python-api/)
+* [get vertices](https://blenderartists.org/t/efficient-copying-of-vertex-coords-to-and-from-numpy-arrays/661467/2)
