@@ -12,7 +12,7 @@ support Blender 2.8+, 2.9+, 3.0+
 
 ## Update note
 > 2022.02.17
-1. update rgb point cloud (very good, faster than point_cloud_visualizer addon !!!)
+1. update rgb point cloud (very good, faster than point_cloud_visualizer addon!!!)
 2. color the object surface based on vertex colors
 > 2022.02.08
 1. add collection management
