@@ -1,10 +1,10 @@
-## Some basic blender functions
+## Some blender python functions for 3D graphics data rendering
 
 ![demo](./env_data/page.png)
 
 
 ## Introduction
-Just some simple function to load models and render the scene
+Some simple tools to load models and render the scene
 
 support Blender 2.8+, 2.9+, 3.0+
 
