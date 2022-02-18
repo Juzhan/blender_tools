@@ -6,6 +6,8 @@
 ## Introduction
 Some simple tools to load models and render the scene
 
+support point cloud and mesh
+
 support Blender 2.8+, 2.9+, 3.0+
 
 ## Update note
