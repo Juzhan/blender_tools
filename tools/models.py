@@ -1,6 +1,3 @@
-import os
-import sys
-import copy
 import math
 import numpy as np
     
@@ -45,28 +42,52 @@ def read_norms(mesh):
 
 # https://github.com/itsumu/point_cloud_renderer
 # https://b3d.interplanety.org/en/how-to-create-a-new-mesh-uv-with-the-blender-python-api/
-def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj_scale=1 ):
+def add_pointcloud(filename, points, name, position, color, radius, scale=1 ):
+    '''
+    Args:
+        filename: str
+            set to None if points is not None
+        points: list[float], [nx3]
+            set to None if filename is not None
+        name: str
+            name of the pointcloud object, just a name
+        position: list[float], [3]
+            position of the hole pointcloud object
+        color: list[float], [4] / [nx4]
+            number between [0,1], rgba of the pointcloud / rgba of each point
+        radius: float
+            radius of the sphere at points
+        scale: float
+            scale of the hole pointcloud object
 
+    Returns:
+        object: bpy.data.object
+    '''
+    
     if filename:
         pc = trimesh.load_mesh(filename)
         points = np.array(pc.vertices)
     
-    points *= obj_scale
-    points += np.array(pos)
+    points *= scale
+    points += np.array(position)
 
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=sphere_radius)
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=radius)
     tmp_obj = bpy.context.active_object
     tmp_obj.name = name + "_tmp"
     tmp_obj.data.name = name + "_tmp"
+    tmp_obj.location = [0,0,0]
+    tmp_obj.rotation_euler = [0,0,0]
 
     bpy.ops.mesh.primitive_plane_add()
     instancer = bpy.context.active_object
     instancer.name = name + "_point_cloud"
     instancer_mesh = instancer.data
     instancer_mesh.name = instancer.name
+    instancer.location = [0,0,0]
+    instancer.rotation_euler = [0,0,0]
 
     # add face for each vertices
-    scale = sphere_radius / 2
+    scale = radius / 2
     
     img_w = int(np.ceil(np.sqrt(len(points))) + 1)
     bm = bmesh.new()
@@ -98,7 +119,7 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
     tmp_obj.parent = instancer
     instancer.instance_type = 'FACES'
 
-    if len(sphere_color) > 4:
+    if len(color) > 4:
 
         # add vertex color
         vertex_color_name = instancer.name + '_col'
@@ -107,10 +128,12 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
         loops = instancer_mesh.loops
 
         for loop_i, loop in enumerate(loops):
-            instancer_mesh.vertex_colors[vertex_color_name].data[loop_i].color = sphere_color[int(loop_i/3)]
+            instancer_mesh.vertex_colors[vertex_color_name].data[loop_i].color = color[int(loop_i/3)]
 
         # add texture
-        mat = vertex_color_material(instancer, instancer.name, vertex_color_name)
+        mat = vertex_rgba_material(instancer.name, vertex_color_name)
+        set_object_mat(instancer, mat)
+
         nodes = mat.node_tree.nodes
         image_node = nodes.new('ShaderNodeTexImage')
         img = bpy.data.images.new( vertex_color_name, img_w, img_w )
@@ -132,11 +155,13 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
             new_uv.data[loop_i].uv = ( y, x )
 
         colors = list(np.zeros( img_w * img_w * 4 ))
-        colors[ :len(sphere_color)*4 ] = sphere_color.flatten()
+        colors[ :len(color)*4 ] = color.flatten()
         img.pixels.foreach_set(colors)
 
         # # add texture for tmp_obj
-        mat = vertex_color_material(tmp_obj, tmp_obj.name, vertex_color_name)
+        mat = vertex_rgb_material(tmp_obj.name, vertex_color_name)
+        set_object_mat(tmp_obj, mat)
+
         nodes = mat.node_tree.nodes
         links = mat.node_tree.links
         image_node = nodes.new('ShaderNodeTexImage')
@@ -148,7 +173,8 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
         links.new( image_node.outputs['Color'], diffuse_node.inputs['Color'] )
         uv_node.from_instancer = True
     else:
-        color_material(tmp_obj, tmp_obj.name, sphere_color)
+        mat = rgba_material(tmp_obj.name, color)
+        set_object_mat(tmp_obj, mat)
 
     set_visible_property(instancer, False, False, False)
 
@@ -162,16 +188,17 @@ def add_pointcloud(filename, points, name, pos, sphere_color, sphere_radius, obj
 #=                           =#
 #=============================#
 
-def add_model( filename, obj_name, obj_pos, obj_rot, obj_color, obj_scale=1, \
+def add_model( filename, name, position, rotation, color, scale=1, \
         texture_path=None, normal_path=None, \
         diffuse=False, glossy=False, shadow=True, use_auto_smooth=False, mat_name=None ):
     '''
     Args:
         filename: str
-        obj_name: str
-        obj_color: list[float] [4]
-        obj_rot: list[float] [3]
-        obj_pos: list[float] [3]
+        name: str
+        position: list[float], [3]
+        rotation: list[float], [3]
+        color: list[float], [4] / [nx4]
+        scale: float
     
     Returns:
         object: bpy.data.object
@@ -185,36 +212,45 @@ def add_model( filename, obj_name, obj_pos, obj_rot, obj_color, obj_scale=1, \
         bpy.ops.import_mesh.stl( filepath=filename )
     
     object = bpy.context.selected_objects[0]
-    object.name = obj_name
+    object.name = name
     object.rotation_mode = 'XYZ'
     object.rotation_euler = [0, 0, 0]
-    object.scale = [obj_scale, obj_scale, obj_scale]
+    object.scale = [scale, scale, scale]
 
     mesh = object.data
     if mesh is not None:
-        mesh.name = obj_name
+        mesh.name = name
 
-    if obj_rot is not None:
-        if len(obj_rot) == 3:
+    if rotation is not None:
+        if len(rotation) == 3:
             object.rotation_mode = 'XYZ'
-            object.rotation_euler = obj_rot
-            object.location = obj_pos
-        elif len(obj_rot) == 4:
+            object.rotation_euler = rotation
+            object.location = position
+        elif len(rotation) == 4:
             object.rotation_mode = 'QUATERNION'
-            object.rotation_quaternion = obj_rot
-            object.location = obj_pos
+            object.rotation_quaternion = rotation
+            object.location = position
 
     set_visible_property(object, diffuse, glossy, shadow)
 
     object.data.use_auto_smooth = use_auto_smooth
 
     if mat_name is None:
-        mat_name = obj_name
+        mat_name = name
 
+    mat = None
     if texture_path is not None:
-        image_material(object, mat_name, obj_color, texture_path, normal_path)
-    elif obj_color is not None:
-        color_material(object, mat_name, obj_color)
+        mat = image_material(mat_name, texture_path, normal_path)
+    elif color is not None:
+        if len(color) == 4:
+            mat = rgba_material(mat_name, color)
+        else:            
+            set_vertex_color(object, colors, f'{name}_vert')
+            mat = vertex_rgba_material(f'{name}_vert_mat', f'{name}_vert')
+
+    if mat is not None:
+        set_object_mat(object, mat)
+
     return object
 
 
@@ -311,10 +347,18 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8
     if mat_name is None:
         mat_name = obj_name
 
+    mat = None
     if texture_path is not None:
-        image_material(object, mat_name, obj_color, texture_path, normal_path)
+        mat = image_material(mat_name, texture_path, normal_path)
     elif obj_color is not None:
-        color_material(object, mat_name, obj_color)
+        if len(obj_color) == 4:
+            mat = rgba_material(mat_name, obj_color)
+        else:
+            set_vertex_color(object, obj_color, f'{obj_name}_vert')
+            mat = vertex_rgba_material(f'{obj_name}_vert_mat', f'{obj_name}_vert')
+
+    if mat is not None:
+        set_object_mat(object, mat)
 
     return object
 
@@ -399,7 +443,8 @@ def add_curve_from_points( name, points, radius, color=[1,1,1,1], scale_factor =
     if mat_name is None:
         mat_name = name
 
-    color_material(obj, mat_name, color)
+    mat = rgba_material(mat_name, color)
+    set_object_mat(obj, mat)
 
     return obj
     
@@ -443,8 +488,9 @@ def add_curve_from_points2(name, points, radius, color=[1,1,1,1], scale_factor =
     if mat_name is None:
         mat_name = name
 
-    color_material(obj, mat_name, color)
-    
+    mat = rgba_material(mat_name, color)
+    set_object_mat(obj, mat)
+
     return obj
 
 def add_curve(name, points, radius, color=[1,1,1,1], scale_factor = 1, radius_factor = 1,\
@@ -504,6 +550,8 @@ def add_curve(name, points, radius, color=[1,1,1,1], scale_factor = 1, radius_fa
 
         remove_object(node_copy, False)
         remove_object(curve_copy, False)
+
+    points = np.array(points)
 
     if mat_name is None:
         mat_name = name
@@ -641,142 +689,3 @@ def subdivide(obj, levels=2):
 #----------------------------------------------
 # modifier end
 #----------------------------------------------
-
-
-# TODO
-class Voxel:
-    '''
-    voxel class
-    
-    Args:
-        x: x
-    
-    Functions:
-        x -> x
-    
-    '''
-    def __init__(self, voxel_size, voxel_unit, voxel_center):
-        self.size = voxel_size
-        self.unit = voxel_unit
-        self.center = voxel_center
-        self.start_pos = self.center - self.unit * self.size / 2
-
-    def get_voxel(self, i,j,k):
-        voxel_leftup = self.start_pos + np.array([i,j,k]) * self.unit
-        voxel_rightdown = voxel_leftup + self.unit
-        return voxel_leftup, voxel_rightdown
-
-    def inside(self, i, p, start):
-        return (i*self.unit + start <= p) and ( (i+1)*self.unit + start > p)
-
-    def find_voxel(self, p):
-        return np.floor((p - self.start_pos) / self.unit).astype('int')
-
-    def is_valid(self, i,j,k):
-        return ( i < self.size ) and ( j < self.size ) and ( k < self.size )
-    
-    def get_pos(self, i,j,k):
-        return self.start_pos + self.unit * (np.array([i,j,k]) + [0.5,0.5,0.5])
-
-    def cut_voxel(self, voxel, cut=[20,-1,-1]):
-        if cut[0] >= 0:
-            voxel = voxel[cut[0],:,:]
-        elif cut[1] >= 0:
-            voxel = voxel[:, cut[1], :]
-        if cut[2] >= 0:
-            voxel = voxel[:,:,cut[2]]
-        return voxel
-
-    def divide_voxel_two(self, voxel, axis='y'):
-
-        part_one = np.zeros( [self.size, self.size] )-1
-        for i in range(self.size):
-            for j in range(self.size):
-                # for k in range(self.size):
-                if voxel[i,j] == 0:
-                    part_one[i,j] = 0
-                else:
-                    break
-        # part_one[:,:7] = -1
-        
-        part_two = np.zeros( [self.size, self.size] )-1
-        s = self.size - 1
-        for i in range(self.size):
-            for j in range(self.size):
-                # for k in range(self.size):
-                if voxel[s-i,s-j] == 0:
-                    part_two[s-i,s-j] = 0
-                else:
-                    break
-        return part_one, part_two
-
-def voxel_data(data_folder, name, voxel, data_sign):
-    def sign(a):
-        if a < 0 : return -1
-        if a == 0 : return 0
-        if a > 0 : return 1
-    
-    data = np.loadtxt( os.path.join(data_folder, '%s.txt' % name ) )
-    pos = data[:,:3]
-    obj = data[:,3]
-    hand = data[:,4]
-    time = data[:,-1]
-
-    print(name, " 1: ", np.sum(time == 1) )
-    print(name, " 2: ", np.sum(time == 2) )
-    print(name, " x: ", np.sum(time > 2) )
-
-    voxel_dist = np.zeros( [voxel.size, voxel.size, voxel.size] )
-    voxel_sign = np.zeros( [voxel.size, voxel.size, voxel.size] )
-    voxel_time = np.zeros( [voxel.size, voxel.size, voxel.size] )
-
-    # start 
-    for pi, p in enumerate(pos):
-        i,j,k = voxel.find_voxel(p)
-        voxel_dist[i,j,k] = hand[pi] * data_sign
-        voxel_sign[i,j,k] = sign( hand[pi] ) * data_sign
-        voxel_time[i,j,k] = time[pi]
-    return voxel_dist, voxel_sign, voxel_time
-
-def voxel_cubes(positions, obj_name, obj_size, obj_color):
-    obj_list = []
-    for i, pos in enumerate(positions):
-        obj = add_cube(obj_name+"_%d" % i, pos, [0,0,0], [obj_size, obj_size, obj_size], obj_color)
-        obj_border(obj, 0.01, [1,1,1,1])
-        obj_list.append(obj)
-    return obj_list
-
-def object_bbox( obj ):
-    # min_x = 1000
-    # max_x = -1000
-    # min_y = 1000
-    # max_y = -1000
-    # min_z = 1000
-    # max_z = -1000
-
-    # lowest_pt = min([(obj.matrix_world @ v.co).z for v in obj.data.vertices])
-
-    v = [(obj.matrix_world @ v.co) for v in obj.data.vertices]
-    v = np.array(v)
-
-    min_x = min(v[:,0])
-    min_y = min(v[:,1])
-    min_z = min(v[:,2])
-    
-    max_x = max(v[:,0])
-    max_y = max(v[:,1])
-    max_z = max(v[:,2])
-
-    # for vertex in object.data.vertices:
-    #     x, y, z = np.array(vertex.co)
-    #     if min_x > x: min_x = x
-    #     if max_x < x: max_x = x
-
-    #     if min_y > y: min_y = y
-    #     if max_y < y: max_y = y
-
-    #     if min_z > z: min_z = z
-    #     if max_z < z: max_z = z
-    return min_x, max_x, min_y, max_y, min_z, max_z
-
-
