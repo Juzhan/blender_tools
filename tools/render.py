@@ -1,9 +1,4 @@
 import bpy
-import os
-import sys
-import copy
-import math
-import numpy as np
 
 # dir = os.path.dirname(bpy.data.filepath)
 # if not dir in sys.path:
@@ -42,6 +37,17 @@ def set_render( resolution_x=640, resolution_y=480, engine="CYCLES", samples=128
     render.resolution_x = resolution_x
     render.resolution_y = resolution_y
 
-    
     # bpy.context.scene.view_settings.view_transform = 'Filmic' # gray
     bpy.context.scene.view_settings.view_transform = color_management
+
+def compose_background():
+    bpy.data.scenes["Scene"].use_nodes = True
+
+    tree = bpy.data.scenes["Scene"].node_tree
+    mixnode = tree.nodes.new(type="CompositorNodeMixRGB")
+    layernode = tree.nodes['Render Layers']
+    compositenode = tree.nodes['Composite']
+    tree.links.new(layernode.outputs['Image'], mixnode.inputs[2])
+    tree.links.new(mixnode.outputs['Image'], compositenode.inputs['Image'])
+    mixnode.blend_type = 'MIX'
+    mixnode.use_alpha = True

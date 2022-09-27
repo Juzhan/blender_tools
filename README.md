@@ -8,7 +8,7 @@ Some simple tools to load models and render the scene
 
 support point cloud and mesh
 
-support Blender 2.8+, 2.9+, 3.0+
+support Blender 3.0+
 
 ## Update note
 > 2022.02.17
@@ -27,10 +27,8 @@ If you want to render point cloud data (`ply` format), you need to install `trim
 blender -b --python-expr "__import__('ensurepip')._bootstrap()" 
 # Update pip toolchain
 blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'pip', 'setuptools', 'wheel'])"
-# pip install trimesh
-blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'trimesh'])"
-# pip install PIL
-blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'pillow'])"
+# pip install numpy, scipy, trimesh, and PIL
+blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'numpy scipy trimesh pillow'])"
 # pip install bpycv
 blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'bpycv'])"
 ```

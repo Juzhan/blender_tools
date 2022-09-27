@@ -11,7 +11,7 @@ import trimesh
 #     sys.path.append(dir)
 
 # change to your path here
-ROOT_DIR = "H:/matlabCode/blender_tools/"
+ROOT_DIR = "F:/Project/blender_tools"
 DATA_DIR = os.path.join(ROOT_DIR, "env_data")
 
 sys.path.append(ROOT_DIR)
@@ -64,7 +64,17 @@ def main():
     
     plane2 = models.add_shape("plane", 'plane', [0,0.25,0], [0,0,0], [0.5,0.25,1], [1,1,1,1], None )
     plane2.is_shadow_catcher = True
-    
+
+    curve = models.add_curve( 'curve',
+        points=[ [0, -0.044, 0.241], [0.04, 0.024, 0.307], [0.054, 0.06, 0.21] ],
+        radius=0.002,
+        color=material.color_map['purple-blue'],
+        curve_style='o-x->', 
+        start_radius=0.004,
+        end_radius=0.004,
+    )
+    scene.move_obj_to_collection( curve, 'Object')
+
     banana = models.add_model(
         os.path.join(DATA_DIR, "model/banana/from_dae.obj"), 'banana', 
         [0,0,0.02], [0,0,0], [0,0,0,1], 
@@ -73,13 +83,10 @@ def main():
 
     cube = models.add_shape("cube", 'cube', [0, 0.25, 0.25], [0,0,np.deg2rad(-45)], [0.07,0.03,0.03], [0,0,0,1], 
         texture_path=os.path.join(DATA_DIR, "texture/castle_brick_02_red_2k_jpg/castle_brick_02_red_ao_2k.jpg"),
-        normal_path=os.path.join(DATA_DIR, "texture/castle_brick_02_red_2k_jpg/castle_brick_02_red_nor_2k.jpg")
-        )
+        normal_path=os.path.join(DATA_DIR, "texture/castle_brick_02_red_2k_jpg/castle_brick_02_red_nor_2k.jpg") )
 
-    cube2 = models.add_shape("cube", 'cube2', [0, 0.25, 0.1], [0,0,np.deg2rad(-45)], [0.07,0.03,0.03], [0,0,0,1],)
     cube_vert_colors = [ material.pure_colors[i] for i in [0,0,1,1,2,2,3,3] ]
-    material.set_vertex_color(cube2, cube_vert_colors, 'cube2_vert')
-    material.vertex_color_material(cube2, 'cube2_mat', 'cube2_vert')
+    cube2 = models.add_shape("cube", 'cube2', [0, 0.25, 0.1], [0,0,np.deg2rad(-45)], [0.07,0.03,0.03], cube_vert_colors)
 
     # add axis
     cube_axis = models.add_axis(name='cube', pos=cube.location, rot=cube.rotation_euler, width=0.004, length=0.1 )
@@ -88,23 +95,16 @@ def main():
     scene.switch_to_collection('PC')
     
     pointcloud = models.add_pointcloud(
-        os.path.join(DATA_DIR, "model/ycb_072-a_toy_airplane_scaled/ycb_072-a_toy_airplane_scaled.ply"),
-        None,
-        "pc",
-        [0, -0.2, 0.1], [0.2, 0.4, 1, 1], 0.001, 0.05 )
+        os.path.join(DATA_DIR, "model/ycb_072-a_toy_airplane_scaled/ycb_072-a_toy_airplane_scaled.ply"), None,
+        "pc", [0, -0.2, 0.1], [0.2, 0.4, 1, 1], 0.001, 0.05 )
     
     pc = trimesh.load_mesh( os.path.join(DATA_DIR, "model/ycb_072-a_toy_airplane_scaled/ycb_072-a_toy_airplane_scaled.ply") )
+
     points = np.array(pc.vertices)
     colors = color_from_height(points)
     pointcloud2 = models.add_pointcloud(
-        os.path.join(DATA_DIR, "model/ycb_072-a_toy_airplane_scaled/ycb_072-a_toy_airplane_scaled.ply"),
-        None,
-        "pc2",
-        [0, -0.4, 0.1], colors, 0.001, 0.05 )
-
-    curve = scene.add_path(
-        [ [0, -0.044, 0.241], [0.04, 0.024, 0.307], [0.054, 0.06, 0.21] ], 'x-x->', node_gap=3
-    )
+        os.path.join(DATA_DIR, "model/ycb_072-a_toy_airplane_scaled/ycb_072-a_toy_airplane_scaled.ply"), None,
+        "pc2", [0, -0.4, 0.1], colors, 0.001, 0.05 )
 
     # render
     render.do_render( os.path.join(ROOT_DIR, "./env_data/page.png") )

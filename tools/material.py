@@ -2,13 +2,25 @@ import bpy
 import math
 import numpy as np
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
 # some color looks nice
 colors = [ "#ffffff",  "#9075de", "#e55953", "#e28678", "#dbcc7b", "#9dc756", "#77cb45", "#c0bed3", "#a0c8c0" ]
 colors = [ "#FBB5AF", "#FBE06F", "#B0E586", "#8AD4D5", "#718DD5", "#A38DDE", "#9ED68C", "#61abff", "#ffb056", '#A9CBFF' ]
+
+color_map = {
+    'purple': [0.503, 0.471, 0.965, 1],
+    'deep_purple': [0.141, 0.173, 0.639, 1],
+    'gray': [0.1, 0.1, 0.1, 1],
+    'red': [0.97, 0.0, 0.0, 1],
+    'light-red': [1, 0.1, 0.1, 1],
+    'blue': [0., 0.363, 1, 1],
+    'light-blue': [0.117, 0.515, 1, 1],
+    'purple-blue': [0.038, 0.208, 860, 1],
+    'black': [0, 0, 0, 1],
+    'white': [1, 1, 1, 1],
+}
 
 pure_colors = [ 
     [1,1,1, 1],
@@ -21,35 +33,11 @@ pure_colors = [
     [0,0,0,1],
 ]
 
-def srgb_to_linearrgb(c):
-    if   c < 0:       return 0
-    elif c < 0.04045: return c/12.92
-    else:             return ((c+0.055)/1.055)**2.4
-
-def hex_to_rgb(hex_str):
-
-    h = int('0x' + hex_str[1:], 0)
-    
-    r = (h & 0xff0000) >> 16
-    g = (h & 0x00ff00) >> 8
-    b = (h & 0x0000ff)
-    return [srgb_to_linearrgb(c/0xff) for c in (r,g,b)]
-
-def hex_to_rgba(hex_str, alpha=1):
-
-    h = int('0x' + hex_str[1:], 0)
-    
-    r = (h & 0xff0000) >> 16
-    g = (h & 0x00ff00) >> 8
-    b = (h & 0x0000ff)
-    return [srgb_to_linearrgb(c/0xff) for c in (r,g,b)] + [alpha]
-
 #============----------------   material   ----------------============#
 
-def image_material( object, mat_name, color, color_texture, normal_texture, shadow_mode='OPAQUE'):
+def image_material( mat_name, color_texture, normal_texture, alpha=1, shadow_mode='OPAQUE'):
     '''
     Args:
-        object: bpy.data.objects[xxx]
         mat_name: str
         color: list[float] 4
         color_texture: str
@@ -63,10 +51,6 @@ def image_material( object, mat_name, color, color_texture, normal_texture, shad
     Returns:
         None
     '''
-
-    obj_name = object.name
-    mat_name = mat_name + "_" + obj_name
-
     mat = bpy.data.materials.get(mat_name)
 
     if mat == None:
@@ -83,7 +67,7 @@ def image_material( object, mat_name, color, color_texture, normal_texture, shad
     # principled_node.inputs.get("Base Color").default_value = color
     principled_node.inputs.get("Roughness").default_value = 1.0
     principled_node.inputs.get("Emission Strength").default_value = 0
-    principled_node.inputs.get("Alpha").default_value = color[3]
+    principled_node.inputs.get("Alpha").default_value = alpha
 
     links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
 
@@ -106,100 +90,13 @@ def image_material( object, mat_name, color, color_texture, normal_texture, shad
         normal_image_node.image = normal_data
         links.new( normal_image_node.outputs['Color'], normal_map_node.inputs['Color'] )
     
-    if color[-1] < 1:
+    if alpha < 1:
         mat.blend_method = 'BLEND'
 
     mat.shadow_method = shadow_mode
-
-    obj_mats = object.data.materials
-    obj_mats.clear()
-    obj_mats.append(mat)
-    object.active_material = mat
-
-def pure_color_material( object, mat_name, color, shadow_mode='OPAQUE'):
-    '''
-    Args:
-        object: bpy.data.objects[xxx]
-        mat_name: str
-        color: list[float] 3
+    return mat
     
-    Returns:
-        None
-    '''
-    mat = bpy.data.materials.get(mat_name)
-
-    if mat == None:
-        mat = bpy.data.materials.new(mat_name)
-    
-    mat.use_nodes = True
-    nodes = mat.node_tree.nodes
-    nodes.clear()
-
-    links = mat.node_tree.links
-
-    output_node = nodes.new('ShaderNodeOutputMaterial')
-    rgb_color_node = nodes.new(type="ShaderNodeRGB")
-    rgb_color_node.location = -200, 300
-    rgb_color_node.color = color
-
-    rgb_color_node.outputs[0].default_value[0] = color[0]
-    rgb_color_node.outputs[0].default_value[1] = color[1]
-    rgb_color_node.outputs[0].default_value[2] = color[2]
-    links.new( rgb_color_node.outputs['Color'], output_node.inputs['Surface'] )
-    
-    mat.shadow_method = shadow_mode
-
-    obj_mats = object.data.materials
-    obj_mats.clear()
-    obj_mats.append(mat)
-    object.active_material = mat
-
-def color_material( object, mat_name, color=(1,0,0,1), shadow_mode='OPAQUE'):
-    '''
-    Args:
-        object: bpy.data.objects[xxx]
-        mat_name: str
-        color: list[float] 4
-        shadow_mode: str (only work for eevee?)
-            "OPAQUE" for shadow \\
-            "NONE" for none
-    
-    Returns:
-        None
-    '''
-    mat = bpy.data.materials.get(mat_name)
-    if mat is None:
-        mat = bpy.data.materials.new(mat_name)
-    
-    mat.name = mat_name
-    mat.use_nodes = True
-    nodes = mat.node_tree.nodes
-    nodes.clear()
-    links = mat.node_tree.links
-
-    principled_node = nodes.new('ShaderNodeBsdfPrincipled')
-    output_node = nodes.new('ShaderNodeOutputMaterial')
-    
-
-    principled_node.inputs.get("Base Color").default_value = color
-    principled_node.inputs.get("Alpha").default_value = color[3]
-
-    # principled_node.inputs.get("Roughness").default_value = 1.0
-    # principled_node.inputs.get("Emission Strength").default_value = 0
-    
-    links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
-
-    if color[-1] < 1:
-        mat.blend_method = 'BLEND'
-
-    mat.shadow_method = shadow_mode
-
-    obj_mats = object.data.materials
-    obj_mats.clear()
-    obj_mats.append(mat)
-    object.active_material = mat
-
-def new_color_material(mat_name, color, shadow_mode='OPAQUE'):
+def rgba_material(mat_name, color, shadow_mode='OPAQUE'):
     '''
     Args:
         mat_name: str
@@ -236,7 +133,7 @@ def new_color_material(mat_name, color, shadow_mode='OPAQUE'):
     mat.shadow_method = shadow_mode
     return mat
 
-def new_pure_color_material( mat_name, color, shadow_mode="NONE"):
+def rgb_material(mat_name, color, shadow_mode="NONE"):
     '''
     Args:
         mat_name: str
@@ -254,7 +151,7 @@ def new_pure_color_material( mat_name, color, shadow_mode="NONE"):
 
     if mat == None:
         mat = bpy.data.materials.new(mat_name)
-        mat.use_nodes = True
+    mat.use_nodes = True
     
     nodes = mat.node_tree.nodes
     nodes.clear()
@@ -264,7 +161,7 @@ def new_pure_color_material( mat_name, color, shadow_mode="NONE"):
     output_node = nodes.new('ShaderNodeOutputMaterial')
 
     rgb_color_node = nodes.new(type="ShaderNodeRGB")
-    rgb_color_node.location = -200, 300
+    # rgb_color_node.location = -200, 300
     rgb_color_node.color = color
 
     rgb_color_node.outputs[0].default_value[0] = color[0]
@@ -276,28 +173,9 @@ def new_pure_color_material( mat_name, color, shadow_mode="NONE"):
 
     return mat
 
-
-def set_vertex_color(obj, vertex_colors, vertex_color_name):
-    vertex_colors = np.array(vertex_colors)
-
-    mesh = obj.data
-
-    # add vertex color
-    if not mesh.vertex_colors:
-        mesh.vertex_colors.new(name=vertex_color_name)
-    
-    mloops = np.zeros((len(mesh.loops)), dtype=np.int)
-    mesh.loops.foreach_get("vertex_index", mloops)
-    
-    # st color for each loop 
-    colors = vertex_colors[np.array(mloops)]
-    colors = colors.flatten()
-    mesh.vertex_colors[vertex_color_name].data.foreach_set("color", colors)
-
-def vertex_color_material( object, mat_name, vertex_color_name):
+def vertex_rgb_material(mat_name, vertex_color_name):
     '''
     Args:
-        object: bpy.data.objects[xxx]
         mat_name: str
         vertex_color_name: str
     
@@ -328,55 +206,61 @@ def vertex_color_material( object, mat_name, vertex_color_name):
     attribute_node.attribute_type = 'GEOMETRY'
     attribute_node.attribute_name = vertex_color_name
 
-    obj_mats = object.data.materials
-    obj_mats.clear()
-    obj_mats.append(mat)
-    object.active_material = mat
-
     return mat
 
-
-def rgb_color_material( object, mat_name, vertex_color_name, shadow_mode='OPAQUE'):
+def vertex_rgba_material(mat_name, vertex_color_name, alpha=1):
     '''
     Args:
-        object: bpy.data.objects[xxx]
         mat_name: str
-        color: list[float] 4
-        shadow_mode: str (only work for eevee?)
-            "OPAQUE" for shadow \\
-            "NONE" for none
+        vertex_color_name: str
     
     Returns:
-        None
+        material: bpy.data.materials[xxx]
     '''
-    mat = bpy.data.materials.get(mat_name)
-    if mat is None:
-        mat = bpy.data.materials.new(mat_name)
     
-    mat.name = mat_name
-    mat.use_nodes = True
+    mat = bpy.data.materials.get(mat_name)
+
+    if mat == None:
+        mat = bpy.data.materials.new(mat_name)
+        mat.use_nodes = True
+    
     nodes = mat.node_tree.nodes
     nodes.clear()
+
     links = mat.node_tree.links
 
-    vertex_color_node = nodes.new('ShaderNodeVertexColor')
     principled_node = nodes.new('ShaderNodeBsdfPrincipled')
     output_node = nodes.new('ShaderNodeOutputMaterial')
-    
-    vertex_color_node.layer_name = vertex_color_name
+    attribute_node = nodes.new("ShaderNodeAttribute")
 
-    links.new( vertex_color_node.outputs['Color'], principled_node.inputs['Base Color'] )
-    
+    principled_node.inputs.get('Specular').default_value = 0
+    principled_node.inputs.get("Alpha").default_value = alpha
+
     links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
+    links.new( attribute_node.outputs['Color'], principled_node.inputs['Base Color'] )
 
-    mat.shadow_method = shadow_mode
 
-    obj_mats = object.data.materials
-    obj_mats.clear()
-    obj_mats.append(mat)
-    object.active_material = mat
+    attribute_node.attribute_type = 'GEOMETRY'
+    attribute_node.attribute_name = vertex_color_name
+
     return mat
 
+def set_vertex_color(obj, vertex_colors, vertex_color_name):
+    vertex_colors = np.array(vertex_colors)
+
+    mesh = obj.data
+
+    # add vertex color
+    if not mesh.vertex_colors:
+        mesh.vertex_colors.new(name=vertex_color_name)
+    
+    mloops = np.zeros((len(mesh.loops)), dtype=np.int)
+    mesh.loops.foreach_get("vertex_index", mloops)
+    
+    # st color for each loop 
+    colors = vertex_colors[np.array(mloops)]
+    colors = colors.flatten()
+    mesh.vertex_colors[vertex_color_name].data.foreach_set("color", colors)
 
 def set_mat_color(mat_name, color):
     if mat_name not in bpy.data.materials.keys():
@@ -387,26 +271,11 @@ def set_mat_color(mat_name, color):
     mat.node_tree.nodes["Principled BSDF"].inputs['Base Color'].default_value = color
     mat.node_tree.nodes["Principled BSDF"].inputs['Alpha'].default_value = color[3]
 
-def change_pc_mat(alpha):
-    mat_name = 'PCParticlesMaterial'
-    mat = bpy.data.materials[mat_name]
-    nodes = mat.node_tree.nodes
-    links = mat.node_tree.links
-    
-    if 'Principled BSDF' not in nodes.keys():
-        node = nodes.new('ShaderNodeBsdfPrincipled')
-
-    else:
-        nodes['Principled BSDF']
-
-    image_node = nodes['Image Texture']
-    output_node = nodes['Material Output']
-    links.new( node.outputs['BSDF'], output_node.inputs['Surface'] )
-    links.new( image_node.outputs['Color'], node.inputs['Base Color'] )
-
-    node.inputs['Alpha'].default_value = alpha
-    
-
+def set_object_mat(object, mat):
+    obj_mats = object.data.materials
+    obj_mats.clear()
+    obj_mats.append(mat)
+    object.active_material = mat
 
 #============----------------   color   ----------------============#
 
@@ -476,3 +345,26 @@ def rgb2hsv(r, g, b):
     v = mx
     return h, s, v
 
+
+def srgb_to_linearrgb(c):
+    if   c < 0:       return 0
+    elif c < 0.04045: return c/12.92
+    else:             return ((c+0.055)/1.055)**2.4
+
+def hex_to_rgb(hex_str):
+
+    h = int('0x' + hex_str[1:], 0)
+    
+    r = (h & 0xff0000) >> 16
+    g = (h & 0x00ff00) >> 8
+    b = (h & 0x0000ff)
+    return [srgb_to_linearrgb(c/0xff) for c in (r,g,b)]
+
+def hex_to_rgba(hex_str, alpha=1):
+
+    h = int('0x' + hex_str[1:], 0)
+    
+    r = (h & 0xff0000) >> 16
+    g = (h & 0x00ff00) >> 8
+    b = (h & 0x0000ff)
+    return [srgb_to_linearrgb(c/0xff) for c in (r,g,b)] + [alpha]

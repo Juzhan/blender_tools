@@ -1,32 +1,5 @@
-import os
-import sys
-import copy
-import math
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import time
-
 import bpy
-
 from inspect import getcallargs
-
-from scipy.spatial.transform import Rotation
-
-import tools.models as models
-
-color_map = {
-    'purple': [0.503, 0.471, 0.965, 1],
-    'deep_purple': [0.141, 0.173, 0.639, 1],
-    'gray': [0.1, 0.1, 0.1, 1],
-    'red': [0.97, 0.0, 0.0, 1],
-    'light-red': [1, 0.1, 0.1, 1],
-    'blue': [0., 0.363, 1, 1],
-    'light-blue': [0.117, 0.515, 1, 1],
-    'pruple-blue': [0.038, 0.208, 860, 1],
-    'black': [0, 0, 0, 1],
-    'white': [1, 1, 1, 1],
-}
 
 
 #============----------------   Scene   ----------------============#
@@ -147,106 +120,7 @@ def add_model_in_collection(func):
 
     return wrapper
 
-
 def hide_collection(collection_name, hide):
     if has_collection(collection_name):
         col = bpy.data.collections.get(collection_name)
         col.hide_render = hide
-
-
-#============----------------   Path   ----------------============#
-
-def sample_dics(points, min_dist):
-    point_len = len(points)
-    ret = []
-    ret_index = []
-    current_p = points[0]
-    next_p = points[1]
-
-    for i in range(1, point_len-1):
-        if np.linalg.norm(current_p - next_p) > min_dist:
-            ret.append(current_p)
-            ret_index.append(i)
-            current_p = points[i]
-        next_p = points[i+1]
-
-    current_p = points[-1]
-    ret.append(current_p)
-    ret_index.append(point_len-1)
-    
-    ret_index = np.array(ret_index)
-    ret = np.array(ret)
-
-    sort_ids = np.argsort(ret_index)
-    ret = ret[sort_ids]
-    ret_index = ret_index[sort_ids]
-    
-    return ret, ret_index
-    
-def insert_points(points, density=5):
-    points_num = len(points)
-    ret = []
-    for i in range(0, points_num-1):
-        new_points = np.linspace(points[i], points[i+1], density)
-        for p in new_points:
-            ret.append(p)
-    return np.array(ret)
-
-
-@add_model_in_collection
-def add_path( points, curve_style='o-o-o', min_dist=0.009, collection_name='PATH', node_gap = 30 ):
-
-    clear_collection(collection_name)
-    switch_to_collection(collection_name)
-
-    # insert points
-    points = insert_points(points, density=50)
-    
-    if len(points) == 0: return
-    points, points_ids = sample_dics(points, min_dist)
-    print(' sample points num: %d' % (len(points)))
-
-    if len(points) == 0: return
-    # insert for average gap points
-    points = insert_points(points, density=1)
-    print(' insert points num: %d' % (len(points)))
-
-    curve_name = "%s_curve" % collection_name
-
-    curve_radius = 0.0025
-    start_radius = 0.010
-    end_radius = 0.007
-    node_radius = 0.007
-
-    curve_color = color_map['purple']
-    start_color = color_map['deep_purple']
-    curve_color[-1] = 0.4
-    start_color[-1] = 0.6
-    end_color = None
-
-    # node_gap = 30
-    node_points = None
-
-    if 'O' in curve_style:
-        node_radius = 0.04
-
-        curve_color = color_map['light-red']
-        curve_color[-1] = 0.2
-
-    curve = models.add_curve( curve_name, points, curve_radius, curve_color, \
-        curve_style=curve_style, \
-        start_radius=start_radius, end_radius=end_radius, node_radius=node_radius, \
-        start_color=start_color, end_color=end_color, \
-        node_gap=node_gap, node_points=node_points )
-    
-    if curve is not None and bpy.data.collections.get(collection_name).objects.get(curve_name) == None:
-        bpy.data.collections.get(collection_name).objects.link(curve)
-
-
-#============----------------   Curve   ----------------============#
-
-# https://zhidao.baidu.com/question/437469857900795604.html
-def s_curve(rate, k=2, a=0.1, b=0.5):
-    # scale_rate = (end_frame) / (end_index - start_index)
-    return (2*b)/(1+math.exp( 4 * k * (a - rate)))
-

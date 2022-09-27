@@ -1,9 +1,8 @@
-import os
-import sys
 import copy
 import math
 import numpy as np
 
+# some bugs, please use scipy.spatial.transform for correct results
 
 #============----------------   vec / euler   ----------------============#
 
