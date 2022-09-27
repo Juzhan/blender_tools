@@ -39,6 +39,22 @@ def read_norms(mesh):
     mesh.vertices.foreach_get("normal", mverts_no)
     return np.reshape(mverts_no, (len(mesh.vertices), 3))
 
+def smooth(obj):
+    mesh = obj.data
+    mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
+    obj.data.use_auto_smooth = True
+
+
+def edit_model(obj):
+    obj.select_set( True )
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.editmode_toggle()
+    # bpy.ops.object.select_all(action='SELECT')
+    # bpy.ops.mesh.remove_doubles()
+
+    # do something here
+
+    bpy.ops.object.editmode_toggle()
 
 # https://github.com/itsumu/point_cloud_renderer
 # https://b3d.interplanety.org/en/how-to-create-a-new-mesh-uv-with-the-blender-python-api/
@@ -188,6 +204,16 @@ def add_pointcloud(filename, points, name, position, color, radius, scale=1 ):
 #=                           =#
 #=============================#
 
+def add_model_by_vertex(vertices, edges, faces, name):
+    new_mesh = bpy.data.meshes.new('new_mesh')
+    new_mesh.from_pydata(vertices, edges, faces)
+    new_mesh.update()
+    new_mesh.name = name
+    # make object from mesh
+    new_object = bpy.data.objects.new(name, new_mesh)
+    bpy.context.collection.objects.link(new_object)    
+    return new_object
+
 def add_model( filename, name, position, rotation, color, scale=1, \
         texture_path=None, normal_path=None, \
         diffuse=False, glossy=False, shadow=True, use_auto_smooth=False, mat_name=None ):
@@ -210,7 +236,7 @@ def add_model( filename, name, position, rotation, color, scale=1, \
         bpy.ops.import_mesh.ply( filepath=filename )
     elif filename.endswith('stl'):
         bpy.ops.import_mesh.stl( filepath=filename )
-    
+        
     object = bpy.context.selected_objects[0]
     object.name = name
     object.rotation_mode = 'XYZ'
@@ -252,8 +278,6 @@ def add_model( filename, name, position, rotation, color, scale=1, \
         set_object_mat(object, mat)
 
     return object
-
-
 
 def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8,0.8,1], \
         shape_setting=None, \
