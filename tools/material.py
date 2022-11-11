@@ -173,6 +173,49 @@ def rgb_material(mat_name, color, shadow_mode="NONE"):
 
     return mat
 
+def trans_rgb_material(mat_name, color, mix_rate=0.5):
+    '''
+    Args:
+        mat_name: str
+        color: list[float] 3/4
+        mix_rate: float
+            large rate will be more transparent
+    
+    Returns:
+        material: bpy.data.materials[xxx]
+    '''
+    
+    mat = bpy.data.materials.get(mat_name)
+    if mat is None:
+        mat = bpy.data.materials.new(mat_name)
+    
+    mat.use_nodes = True
+    
+    nodes = mat.node_tree.nodes
+    nodes.clear()
+    
+    links = mat.node_tree.links
+    emission_node = nodes.new('ShaderNodeEmission')
+    trans_node = nodes.new('ShaderNodeBsdfTransparent')
+    mix_node = nodes.new('ShaderNodeMixShader')
+    color_node = nodes.new('ShaderNodeRGB')
+
+    output_node = nodes.new('ShaderNodeOutputMaterial')
+    
+    if len(color) == 3:
+        color = list(color) + [1.0]
+
+    color_node.outputs.get("Color").default_value = color
+    mix_node.inputs[0].default_value = mix_rate
+
+    # links.new( color_node.outputs['Color'], trans_node.inputs['Color'] )
+    links.new( color_node.outputs['Color'], emission_node.inputs['Color'] )
+    links.new( emission_node.outputs['Emission'], mix_node.inputs[1] )
+    links.new( trans_node.outputs['BSDF'], mix_node.inputs[2] )
+    links.new( mix_node.outputs['Shader'], output_node.inputs['Surface'] )
+
+    return mat
+
 def vertex_rgb_material(mat_name, vertex_color_name):
     '''
     Args:
