@@ -207,7 +207,9 @@ def add_pointcloud(filename, points, name, position, color, radius, scale=1 ):
 def add_model_by_vertex(vertices, edges, faces, name):
     new_mesh = bpy.data.meshes.new('new_mesh')
     new_mesh.from_pydata(vertices, edges, faces)
-    new_mesh.update()
+    # must set calc_edges=True, or it would crash when the object is in edit mode in windows
+    new_mesh.update(calc_edges=True)
+    # new_mesh.validate(verbose=True)
     new_mesh.name = name
     # make object from mesh
     new_object = bpy.data.objects.new(name, new_mesh)
