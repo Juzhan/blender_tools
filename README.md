@@ -28,7 +28,9 @@ blender -b --python-expr "__import__('ensurepip')._bootstrap()"
 # Update pip toolchain
 blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'pip', 'setuptools', 'wheel'])"
 # pip install numpy, scipy, trimesh, and PIL
-blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'numpy scipy trimesh pillow'])"
+blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'trimesh'])"
+blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', ' scipy'])"
+blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', ' pillow'])"
 # pip install bpycv
 blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'bpycv'])"
 ```
