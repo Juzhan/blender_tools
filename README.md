@@ -21,7 +21,7 @@ support Blender 3.0+
 4. reorganize the code
 
 ## Dependencies
-If you want to render point cloud data (`ply` format), you need to install `trimesh` in blender:
+If you want to render point cloud data (`ply` format), you need to install `trimesh` in blender, open a terminal and execute the following command:
 ```
 # Get pip: equl to /blender-path/2.xx/python/bin/python3.7m -m ensurepip
 blender -b --python-expr "__import__('ensurepip')._bootstrap()" 
@@ -37,11 +37,13 @@ blender -b --python-expr "__import__('pip._internal')._internal.main(['install',
 
 ## Usage
 
-Before you run `demo.py`, please mordify the `ROOT_DIR` at line 14 to your folder path, then run: 
+Before you run `demo.py`, please modify the `ROOT_DIR` at line 14 to your folder path, then run: 
 
 ```
 blender -b -P demo.py
 ```
+
+Or you can open the `demo.blend` and modify the `ROOT_DIR` to run the script, then you can see the result in blender.
 
 ## Acknowledgements
 Learn from 
