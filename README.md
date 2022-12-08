@@ -10,10 +10,11 @@ support point cloud and mesh
 
 support Blender 3.0+
 
+### ⚠️⚠️⚠️ I recommend using [BlenderToolbox](https://github.com/HTDerekLiu/BlenderToolbox/),  there are a lot of scripts in the [demo](https://github.com/HTDerekLiu/BlenderToolbox/tree/master/demos), and it is also easy to use!
+
 ## Update note
 > 2022.12.08
 1. Now blender 3.0+ allready support better point cloud visualization based on geometry node
-2. I recommend using [BlenderToolbox](https://github.com/HTDerekLiu/BlenderToolbox/), there are a lot of scripts in the [demo](https://github.com/HTDerekLiu/BlenderToolbox/tree/master/demos), and it is also easy to use!
 
 > 2022.02.17
 1. update rgb point cloud (very good, faster than point_cloud_visualizer addon!!!)
