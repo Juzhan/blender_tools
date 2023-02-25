@@ -16,6 +16,13 @@ support point cloud and mesh
 support Blender 3.0+
 
 ## Update note
+
+> 2022.12.21
+作为课程助教的时候做了一份简单的blender入门指南，有兴趣的话欢迎下载来看看：
+  
+  ppt与文件下载链接: https://pan.baidu.com/s/1vOHMwOzvhZpCtMbjGkI24g 
+  提取码: 6mfz 
+
 > 2022.12.08
 1. Now blender 3.0+ allready support better point cloud visualization based on geometry node
 
