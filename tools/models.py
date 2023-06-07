@@ -58,7 +58,7 @@ def edit_model(obj):
 
 # https://github.com/itsumu/point_cloud_renderer
 # https://b3d.interplanety.org/en/how-to-create-a-new-mesh-uv-with-the-blender-python-api/
-def add_pointcloud(filename, points, name, position, color, radius, scale=1 ):
+def add_pointcloud(filename, points, name, position, color, radius, scale=1, shadow=True ):
     '''
     Args:
         filename: str
@@ -135,6 +135,8 @@ def add_pointcloud(filename, points, name, position, color, radius, scale=1 ):
     tmp_obj.parent = instancer
     instancer.instance_type = 'FACES'
 
+    color_mode = 'rgba'
+
     if len(color) > 4:
 
         # add vertex color
@@ -175,7 +177,12 @@ def add_pointcloud(filename, points, name, position, color, radius, scale=1 ):
         img.pixels.foreach_set(colors)
 
         # # add texture for tmp_obj
-        mat = vertex_rgb_material(tmp_obj.name, vertex_color_name)
+
+        if color_mode == 'rgba':
+            mat = vertex_rgba_material(tmp_obj.name, vertex_color_name)
+        else:
+            mat = vertex_rgb_material(tmp_obj.name, vertex_color_name)
+        
         set_object_mat(tmp_obj, mat)
 
         nodes = mat.node_tree.nodes
@@ -184,15 +191,19 @@ def add_pointcloud(filename, points, name, position, color, radius, scale=1 ):
         image_node.image = img
         
         uv_node = nodes.new('ShaderNodeTexCoord')
-        diffuse_node = nodes['Diffuse BSDF']
         links.new( uv_node.outputs['UV'], image_node.inputs['Vector'] )
-        links.new( image_node.outputs['Color'], diffuse_node.inputs['Color'] )
+        if color_mode == 'rgba':
+            diffuse_node = nodes['Principled BSDF']
+            links.new( image_node.outputs['Color'], diffuse_node.inputs['Base Color'] )
+        else:
+            diffuse_node = nodes['Diffuse BSDF']
+            links.new( image_node.outputs['Color'], diffuse_node.inputs['Color'] )
         uv_node.from_instancer = True
     else:
         mat = rgba_material(tmp_obj.name, color)
         set_object_mat(tmp_obj, mat)
 
-    set_visible_property(instancer, False, False, False)
+    set_visible_property(instancer, shadow=shadow)
 
     bm.free()
 
