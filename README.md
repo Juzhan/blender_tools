@@ -37,7 +37,7 @@ support Blender 3.0+
 
 ## Dependencies
 If you want to render point cloud data (`ply` format), you need to install `trimesh` in blender, open a terminal and execute the following command:
-```
+<!-- ```
 # Get pip: equl to /blender-path/2.xx/python/bin/python3.7m -m ensurepip
 blender -b --python-expr "__import__('ensurepip')._bootstrap()" 
 # Update pip toolchain
@@ -48,6 +48,18 @@ blender -b --python-expr "__import__('pip._internal')._internal.main(['install',
 blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', ' pillow'])"
 # pip install bpycv
 blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'bpycv'])"
+``` -->
+
+1. go to the python folder of your blender: 
+
+![python](./env_data/python_path.png)
+
+2. install same package we need :
+
+```
+python.exe -m pip install trimesh
+
+python.exe -m pip install bpycv
 ```
 
 ## Usage

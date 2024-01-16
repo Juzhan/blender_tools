@@ -15,7 +15,7 @@ from tools.material import *
 from tools.transform import *
 # 
 def set_visible_property(object, diffuse=True, glossy=True, shadow=True):
-    if bpy.app.version[0] == 3:
+    if bpy.app.version[0] >= 3:
         object.visible_diffuse = diffuse
         object.visible_glossy = glossy
         object.visible_shadow = shadow
@@ -250,9 +250,15 @@ def add_model( filename, name, position, rotation, color, scale=1, \
         bpy.context.view_layer.objects.active = object
     else:
         if filename.endswith('obj'):
-            bpy.ops.import_scene.obj( filepath=filename )
+            if bpy.app.version[0] >= 4:
+                bpy.ops.wm.obj_import( filepath=filename )
+            else:
+                bpy.ops.import_scene.obj( filepath=filename )
         elif filename.endswith('ply'):
-            bpy.ops.import_mesh.ply( filepath=filename )
+            if bpy.app.version[0] >= 4:
+                bpy.ops.wm.ply_import( filepath=filename )
+            else:
+                bpy.ops.import_mesh.ply( filepath=filename )
         elif filename.endswith('stl'):
             bpy.ops.import_mesh.stl( filepath=filename )
             
@@ -682,7 +688,15 @@ def join_objects(objs, obj_name):
     c = {}
     c["object"] = c["active_object"] = objs[0]
     c["selected_objects"] = c["selected_editable_objects"] = objs
-    bpy.ops.object.join(c)    
+
+    if bpy.app.version[0] >= 4:
+        with bpy.context.temp_override( object = c['object'], \
+                                       active_object = c['active_object'], \
+                                       selected_objects = c['selected_objects'],\
+                                        selected_editable_objects = c['selected_editable_objects'] ):
+            bpy.ops.object.join()
+    else:
+        bpy.ops.object.join(c)
     objs[0].name = obj_name
     return objs[0]
 

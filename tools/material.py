@@ -276,7 +276,9 @@ def vertex_rgba_material(mat_name, vertex_color_name, alpha=1):
     output_node = nodes.new('ShaderNodeOutputMaterial')
     attribute_node = nodes.new("ShaderNodeAttribute")
 
-    principled_node.inputs.get('Specular').default_value = 0
+    if bpy.app.version[0] <= 3:
+        principled_node.inputs.get('Specular').default_value = 0
+
     principled_node.inputs.get("Alpha").default_value = alpha
 
     links.new( principled_node.outputs['BSDF'], output_node.inputs['Surface'] )
