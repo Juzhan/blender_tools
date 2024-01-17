@@ -40,6 +40,18 @@ def color_from_height( points ):
     colors = material.get_cmap_color( z, cmap_type='jet')
     return colors
 
+@scene.add_model_in_collection
+def add_models_example(collection_name='example_obj'):
+    # example of using add_model_in_collection, you need to add a 'collection_name' parameter in the function
+    # when run the function, all the objects in the collection will be the children of a collection empty axis
+    # 
+    banana2 = models.add_model(
+        os.path.join(DATA_DIR, "model/banana/from_dae.obj"), 'banana', 
+        [-0.2,0.,0.02], [0,0,0], [0,0,0,1], 
+        texture_path=os.path.join(DATA_DIR, "model/banana/texture_map.png")
+    )
+
+    return banana2
 
 def main():
     # clean all object
@@ -91,7 +103,15 @@ def main():
     # add axis
     cube_axis = models.add_axis(name='cube', pos=cube.location, rot=cube.rotation_euler, width=0.004, length=0.1 )
     scene.move_obj_to_collection(cube_axis, 'Object')
-    
+
+    # add another banana but with 'Collection axis', 
+    # you can find a object name 'EXAMPLE_Empty' in the scene
+    # the banana2 is its child
+    collection_name='EXAMPLE'
+    banana2 = add_models_example(collection_name)
+    bpy.data.objects[f"{collection_name}_Empty"].rotation_euler[2] = np.deg2rad(30)
+
+    # add point cloud
     scene.switch_to_collection('PC')
     
     pointcloud = models.add_pointcloud(

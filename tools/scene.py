@@ -95,13 +95,14 @@ def get_object_in_collection(collection_name):
 def add_model_in_collection(func):
     def wrapper(*args, **kwargs):
         
-        ret = func(*args, **kwargs)
-        
-        # link all model in that colleciton on a empty link
         all_args = getcallargs(func, *args, **kwargs)
         collection_name = all_args.get('collection_name')
 
         switch_to_collection(collection_name)
+        
+        ret = func(*args, **kwargs)
+        
+        # link all model in that colleciton on a empty link
         collection = bpy.data.collections.get(collection_name)
         # create empty obj
         collection_empty_name = '%s_Empty' % collection_name
@@ -110,7 +111,7 @@ def add_model_in_collection(func):
             bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
             empty = bpy.context.active_object
             empty.name = collection_empty_name
-            empty.hide_viewport = True
+            # empty.hide_viewport = True
 
         # get no parent object
         for o in collection.objects:
