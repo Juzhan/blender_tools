@@ -17,6 +17,9 @@ support Blender 3.0+
 
 ## Update note
 
+> 2024.01.17
+根据blender 4调整了一些函数，加了一个中文的简易使用说明：[中文说明](./doc/how_to_use.md)
+
 > 2022.12.21
 作为课程助教的时候做了一份简单的blender入门指南，有兴趣的话欢迎下载来看看：
   
@@ -37,18 +40,6 @@ support Blender 3.0+
 
 ## Dependencies
 If you want to render point cloud data (`ply` format), you need to install `trimesh` in blender, open a terminal and execute the following command:
-<!-- ```
-# Get pip: equl to /blender-path/2.xx/python/bin/python3.7m -m ensurepip
-blender -b --python-expr "__import__('ensurepip')._bootstrap()" 
-# Update pip toolchain
-blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'pip', 'setuptools', 'wheel'])"
-# pip install numpy, scipy, trimesh, and PIL
-blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'trimesh'])"
-blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', ' scipy'])"
-blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', ' pillow'])"
-# pip install bpycv
-blender -b --python-expr "__import__('pip._internal')._internal.main(['install', '-U', 'bpycv'])"
-``` -->
 
 1. go to the python folder of your blender: 
 
