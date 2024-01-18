@@ -31,13 +31,3 @@ def insert_keys(obj, frame_list, value_list, data_path, index=-1):
         obj.keyframe_insert(data_path=data_path, index=index, frame=key_frame)
 
 
-def set_render_frames(start_frame, end_frame):
-    '''
-    Args:
-        start_frame: int
-        end_frame: int
-    '''
-    
-    bpy.data.scenes["Scene"].frame_start = start_frame
-    bpy.data.scenes["Scene"].frame_end = end_frame
-    bpy.data.scenes["Scene"].frame_current = start_frame

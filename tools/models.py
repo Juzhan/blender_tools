@@ -300,7 +300,7 @@ def add_model( filename, name, position, rotation, color, scale=1, \
 
     return object
 
-def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8,0.8,1], \
+def add_shape(obj_type, obj_name, position, angles, scale=1, obj_color=[0.8,0.8,0.8,1], \
         shape_setting=None, \
         texture_path=None, normal_path=None, \
         diffuse=False, glossy=False, shadow=True, mat_name=None ):
@@ -315,8 +315,8 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8
             >>> 'torus'
 
         obj_name: str
-        obj_pos: list[float] [3]
-        obj_rot: list[float] [3]
+        position: list[float] [3]
+        angles: list[float] [3]
         obj_color: list[float] [4]
         shape_setting: dict
             specify for shape
@@ -382,10 +382,10 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8
     
     object.data.name = obj_name
 
-    object.scale = obj_size
+    object.scale = scale
     object.rotation_mode = 'XYZ'
-    object.rotation_euler= obj_rot
-    object.location= obj_pos
+    object.rotation_euler= [ np.deg2rad(ang) for ang in angles ]
+    object.location= position
 
     set_visible_property(object, diffuse, glossy, shadow)
 

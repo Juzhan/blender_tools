@@ -80,11 +80,13 @@ def main():
 
     animator.insert_keys(axis, frame_list, value_list, 'rotation_euler', index=2)
 
-    animator.set_render_frames(0, frame_list[-1])
+    render.set_render_frames(0, frame_list[-1])
     # add white backgroud for video
     render.compose_background(bg_color=[1,1,1,1])
     # set format as mp4, use FFMPEG
-    render.do_render( os.path.join(ROOT_DIR, f"./doc/images/animate/rot.mp4"), format='FFMPEG' )
+    render.set_render(width, height, format='FFMPEG')
+    
+    render.do_render( os.path.join(ROOT_DIR, f"./doc/images/animate/rot.mp4"), animation=True )
 
     # !!!!!! NOTE
     # the mp4 video render from blender maybe have some coding problem,

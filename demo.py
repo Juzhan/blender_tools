@@ -46,9 +46,9 @@ def main():
     scene.clear_all()
 
     # set render
-    width = 1200
-    height = 500
-    render.set_render(width, height)
+    reso_x = 1200
+    reso_y = 500
+    render.set_render(reso_x, reso_y)
 
     scene.switch_to_collection('Cam_and_light')
     # add cam
@@ -108,7 +108,8 @@ def main():
         "pc2", [0, -0.4, 0.1], colors, 0.001, 0.05 )
 
     # render
-    render.do_render( os.path.join(ROOT_DIR, "./doc/images/page.png") )
+    output_img_path = os.path.join(ROOT_DIR, "./doc/images/page.png")
+    render.do_render( output_img_path )
 
 if __name__ == '__main__':
     main()

@@ -44,13 +44,13 @@ def set_sun( energy = 3, angles = [0, 0, 0], sun_name='Sun' ):
     return sun
 
 
-def set_hdr_background( hdr_path, rotation=[0,0,0], strength=1 ):
+def set_hdr_background( hdr_path, angles=[0,0,0], strength=1 ):
     '''
     Add hdr for scene
     
     Args:
         hdr: str
-        rotation: list[float] [3]
+        angles: list[float] [3]
     
     Returns:
         None
@@ -74,7 +74,7 @@ def set_hdr_background( hdr_path, rotation=[0,0,0], strength=1 ):
     img = bpy.data.images.load(hdr_path)
     hdr_tex.image = img
 
-    mapping.inputs['Rotation'].default_value = rotation
+    mapping.inputs['Rotation'].default_value = [ np.deg2rad(ang) for ang in angles ]
     bg.inputs['Strength'].default_value = strength
 
     links.new( tex_coord.outputs['Object'], mapping.inputs['Vector'] )
@@ -82,8 +82,8 @@ def set_hdr_background( hdr_path, rotation=[0,0,0], strength=1 ):
     links.new( hdr_tex.outputs['Color'], bg.inputs['Color'] )
     links.new( bg.outputs['Background'], output_node.inputs['Surface'] )
 
-def set_world_light_rot(rotation):
+def set_world_light_rot(angles):
     world = bpy.data.worlds.get('World')
     nodes = world.node_tree.nodes
     tex_coord = nodes["Mapping"]
-    tex_coord.inputs['Rotation'].default_value = rotation
+    tex_coord.inputs['Rotation'].default_value = [ np.deg2rad(ang) for ang in angles ]
