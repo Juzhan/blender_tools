@@ -57,9 +57,9 @@
 <details>
 <summary>
 旋转场景
-
-<center><video src="../doc/images/animate/rot.mp4"></center>
-
+<p align='center'>
+<img src="../doc/images/animate/rot.gif" width="400"></img>
+</p>
 </summary>
 
 有些时候，我们需要渲染场景的多个视角，直接的想法是我们设置几组相机位置，绕场景一圈拍照渲染就行了，但在光源不动的情况下，这样会得到光照效果不同的几组图，没法用于展示。
@@ -70,11 +70,11 @@
 
 在blender中我们可以将多个物体设置为同个集合来管理，下面是 `demo.py` 执行后会创建的一些物体，我们从场景列表中可以看到这些物体属于不同的白色盒子图标下，这些白色盒子图标表示的就是不同的collection，
 
-<center><img src="../doc/images/collection1.png" style="width:50%;height:auto;"></center>
+<p align='center'><img src="../doc/images/collection1.png" width="400"></p>
 
 而 [`examples/animation.py`](../examples/animation.py) 中的 `add_scene` 函数，它使用到了一个装饰器 `scene.add_model_in_collection`，这个装饰器的作用是将我们写的函数内添加的物体都放入一个集合collection当中，并创建一个坐标系对象，将这些物体都设置为它的子物体。这个函数执行后得到的结果如下图：
 
-<center><img src="../doc/images/collection2.png" style="width:40%;height:auto;"></center>
+<p align='center'><img src="../doc/images/collection2.png" width="300"></p>
 
 
 可以看见使用了装饰器来添加物体的话，这些物体不是直接位于集合的第一层，而是作为一个坐标轴对象（Scene_Empty）的子物体加入了场景，这样的好处是我们通过控制这个坐标轴对象就可以让这个场景中所有物体同步位移旋转和缩放。
@@ -89,7 +89,7 @@
 <details>
 <summary>
 渲染线框
-<center><img src="../doc/images/wireframe.png"></center>
+<p align='center'><img src="../doc/images/wireframe.png"></p>
 </summary>
 
 blender内有多种渲染线框的方式，这里实现了两种，分别是位于 `modifier.py` 里面的 `wireframe` 函数，以及 `material.py` 里面的 `wireframe_material` 函数。在 [`examples/wireframe.py`](../examples/wireframe.py) 中展示了这几个函数的使用方式。
@@ -104,7 +104,9 @@ blender内有多种渲染线框的方式，这里实现了两种，分别是位�
 <details>
 <summary>
 模型表面有奇怪黑影，渲染不正常
-<center><video src="../doc/images/double.mp4"></center>
+<p align='center'>
+<img src="../doc/images/double.gif" width="500"></img>
+</p>
 </summary>
 
 如果你看见一个模型里面有些不自然的表面阴影或者一大块黑色，可能有两种原因：
