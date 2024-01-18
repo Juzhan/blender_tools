@@ -11,7 +11,7 @@ support Blender 3.0+
 [中文版使用简介](./doc/how_to_use.md)
 
 ### ⚠️⚠️⚠️ 
-Hey guys, I strongly recommend using [BlenderToolbox](https://github.com/HTDerekLiu/BlenderToolbox/), it is easy to use, and there are a lot of scripts in the [demo](https://github.com/HTDerekLiu/BlenderToolbox/tree/master/demos)!
+Hey guys, I strongly recommend using [BlenderProc](https://github.com/DLR-RM/BlenderProc/tree/main) and [BlenderToolbox](https://github.com/HTDerekLiu/BlenderToolbox/), they are easy to use, and there are a lot of scripts in the [demo](https://github.com/HTDerekLiu/BlenderToolbox/tree/master/demos)
 
 ## Update note
 
