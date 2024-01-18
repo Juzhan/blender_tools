@@ -26,6 +26,10 @@
 
 `render.py`：与渲染相关的函数，设置渲染参数，进行渲染
 
+`animator.py`：与动画相关的函数，对物体进行关键帧插入
+
+`modifier.py`：与模型处理相关的函数，添加线框、移除重叠网格、光滑表面、组合模型等操作
+
     !!! 其中一些代码需要将软件设置为英文才能使用，因为有的参数名称会随着默认语言变化而相应变化
 
 ### 跑代码前的准备
@@ -35,6 +39,7 @@
 
 ### 简单的使用场景
 `demo.py` 中展示了一个创建场景、导入模型到渲染出图的过程，参照自己的需求使用需要的模型加载函数，设置自己需要的相机位置和渲染分辨率。
+
 
 然后我们可以在不打开blender的情况下，直接用命令行执行：
 
@@ -46,7 +51,17 @@
 
 自己设置好大致的场景摆放参数后，将这些位置、角度数值写进代码，这时候就可以加个for循环什么的让其自动化执行了。
 
+
 ### 稍微复杂点的使用场景
+
+<details>
+<summary>
+旋转场景
+
+<center><video src="../doc/images/animate/rot.mp4"></center>
+
+</summary>
+
 有些时候，我们需要渲染场景的多个视角，直接的想法是我们设置几组相机位置，绕场景一圈拍照渲染就行了，但在光源不动的情况下，这样会得到光照效果不同的几组图，没法用于展示。
 
 如果光源也随着相机旋转，设置会更加麻烦，所以更简单的方式是让场景物体绕着一个Z轴旋转，这样相机和光源都不用修改了。
@@ -55,13 +70,49 @@
 
 在blender中我们可以将多个物体设置为同个集合来管理，下面是 `demo.py` 执行后会创建的一些物体，我们从场景列表中可以看到这些物体属于不同的白色盒子图标下，这些白色盒子图标表示的就是不同的collection，
 
-<center><img src="../env_data/collection1.png" style="width:50%;height:auto;"></center>
+<center><img src="../doc/images/collection1.png" style="width:50%;height:auto;"></center>
 
-而 `demo.py` 中的 `add_models_example` 函数，它使用到了一个装饰器 `scene.add_model_in_collection`，这个装饰器的作用是将我们写的函数内添加的物体都放入一个集合collection当中，并创建一个坐标系对象，将这些物体都设置为它的子物体。这个函数执行后得到的结果如下图：
+而 [`examples/animation.py`](../examples/animation.py) 中的 `add_scene` 函数，它使用到了一个装饰器 `scene.add_model_in_collection`，这个装饰器的作用是将我们写的函数内添加的物体都放入一个集合collection当中，并创建一个坐标系对象，将这些物体都设置为它的子物体。这个函数执行后得到的结果如下图：
 
-<center><img src="../env_data/collection2.png" style="width:40%;height:auto;"></center>
+<center><img src="../doc/images/collection2.png" style="width:40%;height:auto;"></center>
 
 
-可以看见使用了装饰器来添加物体的话，这些物体不是直接位于集合的第一层，而是作为一个坐标轴对象（EXMAPLE_Empty）的子物体加入了场景，这样的好处是我们通过控制这个坐标轴对象就可以让这个场景中所有物体同步位移旋转和缩放。
+可以看见使用了装饰器来添加物体的话，这些物体不是直接位于集合的第一层，而是作为一个坐标轴对象（Scene_Empty）的子物体加入了场景，这样的好处是我们通过控制这个坐标轴对象就可以让这个场景中所有物体同步位移旋转和缩放。
 
 希望这个装饰器起作用的话，需要在函数的参数内加一个叫做 `collection_name` 的参数，设置为你想要的集合名字。
+
+另外有一点要注意，blender默认设置下渲染的视频可能有些编码问题，会导致没法在Mac上播放，暂时不知道什么原因，所以建议再使用 [handBrake](https://handbrake.fr/) 等视频处理工具再把视频编码一下。
+
+</details>
+
+
+<details>
+<summary>
+渲染线框
+<center><img src="../doc/images/wireframe.png"></center>
+</summary>
+
+blender内有多种渲染线框的方式，这里实现了两种，分别是位于 `modifier.py` 里面的 `wireframe` 函数，以及 `material.py` 里面的 `wireframe_material` 函数。在 [`examples/wireframe.py`](../examples/wireframe.py) 中展示了这几个函数的使用方式。
+
+
+第一种线框方法用的是blender的线框修改器，它会基于当前模型的线框生成一个的线框网格模型，这种方法得到的是一个线框网格mesh。这个修改器可以设置线框使用的材质，这个材质是从物体本身的材质列表中选择的，所以有个offset参数，用于设置材质列表中的第几个材质。
+
+第二种线框方法是从材质的角度，物体的材质中提供了一个叫线框的材质节点，我们可以获取这个信息直接绘制出表面的线段，这种方法是在材质图像层面进行的生成。
+
+</details>
+
+<details>
+<summary>
+模型表面有奇怪黑影，渲染不正常
+<center><video src="../doc/images/double.mp4"></center>
+</summary>
+
+如果你看见一个模型里面有些不自然的表面阴影或者一大块黑色，可能有两种原因：
+
+一种是模型表面有多层面片重叠，导致渲染时程序无法确定最终要显示的面片是哪一个，导致区域黑色。在 `env_data/model` 文件夹下提供了一个 `double_face_example.obj`，有兴趣可以导入看看。
+
+这种情况可以先将模型的网格分离成单个面片，再重新拼接，这时候重叠部分会过滤掉。 `modifier.py` 中的 `clean_double_faces` 函数就实现了这个功能。
+
+第二种是模型的法向量有问题，需要重新计算，`modifier.py` 中的 `recalculate_normal` 函数就实现了这个功能，调用了blender的计算操作。但blender的计算方法不能保证一定能修复成功，这时候可以考虑结合上面 `clean_double_faces` 函数，先将模型重组后再计算法向量，这样基本能应对大多数法向量问题。
+
+</details>

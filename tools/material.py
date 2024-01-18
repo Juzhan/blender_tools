@@ -290,6 +290,53 @@ def vertex_rgba_material(mat_name, vertex_color_name, alpha=1):
 
     return mat
 
+def wireframe_material(mat_name, wire_color, base_color, wire_thickness=0.001):
+    '''
+    Args:
+        mat_name: str
+        wire_color: list[float] 3
+        base_color: list[float] 3 | None
+            if base_color is None, it will be transparent
+        wire_thickness: float
+    
+    Returns:
+        material: bpy.data.materials[xxx]
+    '''
+    mat = bpy.data.materials.get(mat_name)
+    if mat is None:
+        mat = bpy.data.materials.new(mat_name)
+
+    mat.use_nodes = True
+
+    nodes = mat.node_tree.nodes
+    nodes.clear()
+
+    links = mat.node_tree.links
+
+    wire_diffues_node = nodes.new('ShaderNodeBsdfDiffuse')
+    base_diffues_node = nodes.new('ShaderNodeBsdfDiffuse')
+    
+    transparent_node = nodes.new('ShaderNodeBsdfTransparent')
+    
+    wireframe_node = nodes.new('ShaderNodeWireframe')
+    mix_node = nodes.new('ShaderNodeMixShader')
+    output_node = nodes.new('ShaderNodeOutputMaterial')
+
+    wireframe_node.inputs.get("Size").default_value = wire_thickness
+    wire_diffues_node.inputs.get('Color').default_value = wire_color
+    
+    if base_color is not None:
+        base_diffues_node.inputs.get('Color').default_value = base_color
+        links.new( base_diffues_node.outputs['BSDF'], mix_node.inputs[1] )
+    else:
+        links.new( transparent_node.outputs['BSDF'], mix_node.inputs[1] )
+
+    links.new( wireframe_node.outputs['Fac'], mix_node.inputs[0] )
+    links.new( wire_diffues_node.outputs['BSDF'], mix_node.inputs[2] )
+
+    links.new( mix_node.outputs['Shader'], output_node.inputs['Surface'] )
+    return mat
+
 def set_vertex_color(obj, vertex_colors, vertex_color_name):
     vertex_colors = np.array(vertex_colors)
 
@@ -316,11 +363,13 @@ def set_mat_color(mat_name, color):
     mat.node_tree.nodes["Principled BSDF"].inputs['Base Color'].default_value = color
     mat.node_tree.nodes["Principled BSDF"].inputs['Alpha'].default_value = color[3]
 
-def set_object_mat(object, mat):
+def set_object_mat(object, mat, clear_pre_mats=True, set_as_active=False):
     obj_mats = object.data.materials
-    obj_mats.clear()
+    if clear_pre_mats:
+        obj_mats.clear()
     obj_mats.append(mat)
-    object.active_material = mat
+    if set_as_active:
+        object.active_material = mat
 
 #============----------------   color   ----------------============#
 

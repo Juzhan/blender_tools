@@ -13,7 +13,8 @@ import trimesh
 
 from tools.material import *
 from tools.transform import *
-# 
+from tools.modifier import *
+
 def set_visible_property(object, diffuse=True, glossy=True, shadow=True):
     if bpy.app.version[0] >= 3:
         object.visible_diffuse = diffuse
@@ -38,11 +39,6 @@ def read_norms(mesh):
     mverts_no = np.zeros((len(mesh.vertices)*3), dtype=np.float)
     mesh.vertices.foreach_get("normal", mverts_no)
     return np.reshape(mverts_no, (len(mesh.vertices), 3))
-
-def smooth(obj):
-    mesh = obj.data
-    mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
-    obj.data.use_auto_smooth = True
 
 
 def edit_model(obj):
@@ -411,8 +407,6 @@ def add_shape(obj_type, obj_name, obj_pos, obj_rot, obj_size, obj_color=[0.8,0.8
 
     return object
 
-
-
 def add_axis(pos=[0,0,0], rot=[0,0,0], quat=None, width=0.02, length=0.5, name='origin'):
     pos = np.array(pos)
 
@@ -718,31 +712,3 @@ def remove_object(obj, remove_mat=True):
             bpy.data.meshes.remove(data)
     else:
         bpy.data.objects.remove(obj)
-
-
-#----------------------------------------------
-# modifier begin
-#----------------------------------------------
-
-def boolean_with(obj_main, obj_with, operation_type="DIFFERENCE", solver='EXACT'):
-    # obj_main.select_set(True)
-    bpy.context.view_layer.objects.active = obj_main
-    b = obj_main.modifiers.new('Boolean', 'BOOLEAN')
-    # b.operation = 'INTERSECT'
-    b.operation = operation_type
-    b.object = obj_with
-    b.solver = solver
-
-    bpy.context.view_layer.objects.active = obj_main
-
-    bpy.ops.object.modifier_apply(modifier='Boolean')
-
-def subdivide(obj, levels=2):
-    subdivision = obj.modifiers.new( "sub", 'SUBSURF' )
-    subdivision.render_levels = levels
-    subdivision.levels = levels
-    bpy.ops.object.modifier_apply(modifier='sub')
-
-#----------------------------------------------
-# modifier end
-#----------------------------------------------

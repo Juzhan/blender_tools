@@ -1,9 +1,5 @@
 import bpy
 
-# dir = os.path.dirname(bpy.data.filepath)
-# if not dir in sys.path:
-#     sys.path.append(dir)
-
 def do_render(render_path, color_mode='RGBA', \
     bg_transparent=True, format="PNG", adaptive_threshold=0.1, exr_codec='DWAA'):
     '''
@@ -16,8 +12,6 @@ def do_render(render_path, color_mode='RGBA', \
     
     render.filepath = render_path
     
-    render.image_settings.color_mode = color_mode
-    
     render.film_transparent = bg_transparent
     render.image_settings.file_format = format
 
@@ -26,7 +20,17 @@ def do_render(render_path, color_mode='RGBA', \
     if format == 'OPEN_EXR':
         bpy.context.scene.render.image_settings.exr_codec = exr_codec
 
-    bpy.ops.render.render(write_still=True)
+    animation = False
+
+    if 'mp4' in render_path or format == 'FFMPEG':
+        bpy.context.scene.render.ffmpeg.format = 'MPEG4'
+        animation = True
+        render.image_settings.color_mode = 'RGB'
+    else:
+        render.image_settings.color_mode = color_mode
+        
+    bpy.ops.render.render(write_still=True, animation=animation)
+
 
 def set_render( resolution_x=640, resolution_y=480, engine="CYCLES", samples=128, color_management='Standard' ):
     # 'CYCLES' or 'BLENDER_EEVEE'
@@ -40,8 +44,10 @@ def set_render( resolution_x=640, resolution_y=480, engine="CYCLES", samples=128
     # bpy.context.scene.view_settings.view_transform = 'Filmic' # gray
     bpy.context.scene.view_settings.view_transform = color_management
 
-def compose_background():
-    bpy.data.scenes["Scene"].use_nodes = True
+
+def compose_background(use_node=True, bg_color=[1,1,1,1]):
+
+    bpy.data.scenes["Scene"].use_nodes = use_node
 
     tree = bpy.data.scenes["Scene"].node_tree
     mixnode = tree.nodes.new(type="CompositorNodeMixRGB")
@@ -51,3 +57,5 @@ def compose_background():
     tree.links.new(mixnode.outputs['Image'], compositenode.inputs['Image'])
     mixnode.blend_type = 'MIX'
     mixnode.use_alpha = True
+    
+    mixnode.inputs[1].default_value = bg_color

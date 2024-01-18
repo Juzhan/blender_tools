@@ -5,7 +5,7 @@
 
 ## Some blender python functions for 3D graphics data rendering
 
-![demo](./env_data/page.png)
+![demo](./doc/images/page.png)
 
 
 ## Introduction
