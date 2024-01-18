@@ -43,7 +43,7 @@ If you want to render point cloud data (`ply` format), you need to install `trim
 
 1. go to the python folder of your blender: 
 
-![python](./env_data/python_path.png)
+![python](./doc/images/python_path.png)
 
 2. install same package we need :
 
