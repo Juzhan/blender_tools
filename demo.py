@@ -113,3 +113,20 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
+#============----------------   How to use in blender GUI   ----------------============#
+'''
+import sys
+import bpy
+
+sys.path.append("F:/Project/blender_tools")
+
+import demo
+import importlib
+
+importlib.reload(demo)
+demo.main()
+
+'''
