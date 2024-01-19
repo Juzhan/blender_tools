@@ -294,8 +294,8 @@ def wireframe_material(mat_name, wire_color, base_color, wire_thickness=0.001):
     '''
     Args:
         mat_name: str
-        wire_color: list[float] 3
-        base_color: list[float] 3 | None
+        wire_color: list[float] 4
+        base_color: list[float] 4 | None
             if base_color is None, it will be transparent
         wire_thickness: float
     
