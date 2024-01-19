@@ -22,11 +22,11 @@ ppt与文件下载链接: https://pan.baidu.com/s/1vOHMwOzvhZpCtMbjGkI24g  | 提
 
 Task | Example | Result
 --- | --- | ---
-Set your models and light, then render. | [`demo.py`](./demo.py)   | <img align='right' height="70px" src="./doc/images/animate/s_0.png" >
-Rotate your scene, render animation. | [`animation.py`](./examples/animation.py)   | <img align='right' height="70px" src="./doc/images/animate/rot.gif" >
-Render object with wireframe. | [`wireframe.py`](./examples/wireframe.py)   | <img align='right' height="70px" src="./doc/images/wireframe.png" >
-Clean the overlap surface of model. | [`clean_double_faces()`](./tools/modifier.py#L65)   | <img align='right' height="70px" src="./doc/images/double.png" >
-Visulize the intersect edges of two objects. | [`show_intersection_lines()`](./tools/modifier.py#L91)   | <img align='right' height="70px" src="./doc/images/intersect.gif" >
+Set your models and light, then render. | [`demo.py`](./demo.py)   | <p align='center'><img height="80px" src="./doc/images/animate/s_0.png" > </p>
+Rotate your scene, render animation. | [`animation.py`](./examples/animation.py)   | <p align='center'><img height="70px" src="./doc/images/animate/rot.gif" > </p>
+Render object with wireframe. | [`wireframe.py`](./examples/wireframe.py)   | <p align='center'><img height="70px" src="./doc/images/wireframe.png" > </p>
+Clean the overlap surface of model. | [`clean_double_faces()`](./tools/modifier.py#L65)   | <p align='center'><img height="90px" src="./doc/images/double.png" > </p>
+Visulize the intersect edges of two objects. | [`show_intersection_lines()`](./tools/modifier.py#L91)   | <p align='center'><img width="90px" src="./doc/images/intersect.gif" > </p>
 Convert image sequence into video. | [`img_to_video.py`](./examples/img_to_video.py)  
 
 
