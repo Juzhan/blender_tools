@@ -30,7 +30,7 @@
 
 `modifier.py`：与模型处理相关的函数，添加线框、移除重叠网格、光滑表面、组合模型等操作
 
-`video.py`：进行视频生成的函数，将一个图片集合转成视频、视频加速等，具体使用例子在 [`../examples/img_to_video.py`](../examples/img_to_video.py)
+`video.py`：进行视频生成的函数，将一个图片集合转成视频、视频加速等，具体使用例子在 [`examples/img_to_video.py`](../examples/img_to_video.py)
 
     !!! 其中一些代码需要将软件设置为英文才能使用，因为有的参数名称会随着默认语言变化而相应变化
 
@@ -107,7 +107,7 @@ blender内有多种渲染线框的方式，这里实现了两种，分别是位�
 <summary>
 模型表面有奇怪黑影，渲染不正常
 <p align='center'>
-<img src="../doc/images/double.gif" width="500"></img>
+<img src="../doc/images/double.gif" width="400"></img>
 </p>
 </summary>
 
@@ -118,5 +118,16 @@ blender内有多种渲染线框的方式，这里实现了两种，分别是位�
 这种情况可以先将模型的网格分离成单个面片，再重新拼接，这时候重叠部分会过滤掉。 `modifier.py` 中的 `clean_double_faces` 函数就实现了这个功能。
 
 第二种是模型的法向量有问题，需要重新计算，`modifier.py` 中的 `recalculate_normal` 函数就实现了这个功能，调用了blender的计算操作。但blender的计算方法不能保证一定能修复成功，这时候可以考虑结合上面 `clean_double_faces` 函数，先将模型重组后再计算法向量，这样基本能应对大多数法向量问题。
+
+</details>
+
+
+<details>
+<summary>
+模型相交线
+<p align='center'><img src="../doc/images/intersect.gif" width="300"></p>
+</summary>
+
+使用了blender中的几何节点进行处理，他们在处理模型boolean操作的时候会输出相交边界的信息，我们将其曲线获取后加上厚度就可以得到图上的效果了，具体函数为 `modifier.py` 中的 `show_intersection_lines`。
 
 </details>

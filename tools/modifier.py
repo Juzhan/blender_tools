@@ -89,7 +89,7 @@ def clean_double_faces(obj, just_remove_doubles=False):
 #----------------------------------------------
 
 def show_intersection_lines(object_list, line_name, line_thickness=0.0015, line_color=[1,0,0,1] ):
-    #  show the intersection lines between some objects
+    #  show the intersection lines between two objects
     
     from tools import material
 
