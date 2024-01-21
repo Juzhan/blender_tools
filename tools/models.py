@@ -225,7 +225,7 @@ def add_model_by_vertex(vertices, edges, faces, name):
 
 def add_model( filename, name, position, rotation, color, scale=1, \
         texture_path=None, normal_path=None, \
-        diffuse=False, glossy=False, shadow=True, use_auto_smooth=False, mat_name=None ):
+        diffuse=True, glossy=True, shadow=True, use_auto_smooth=False, mat_name=None ):
     '''
     Args:
         filename: str
