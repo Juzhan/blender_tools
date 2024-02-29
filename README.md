@@ -58,6 +58,7 @@ Or you can open the `demo.blend` and modify the `ROOT_DIR` to run the script, th
 
 ## Wishlist
 
+* copy scene addon!!!
 * compose about shadow
 * more curve
 * volume render
