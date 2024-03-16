@@ -94,12 +94,33 @@
 <p align='center'><img src="../doc/images/wireframe.png"></p>
 </summary>
 
-blender内有多种渲染线框的方式，这里实现了两种，分别是位于 `modifier.py` 里面的 `wireframe` 函数，以及 `material.py` 里面的 `wireframe_material` 函数。在 [`examples/wireframe.py`](../examples/wireframe.py) 中展示了这几个函数的使用方式。
+blender内有多种渲染线框的方式，这里实现了3种，分别是位于 `modifier.py` 里面的 `wireframe` 函数，以及 `material.py` 里面的 `wireframe_material` 函数，还有一种基于画笔的方式，位于 `modifier.py` 里面的 `render_with_lines` 函数。在 [`examples/wireframe.py`](../examples/wireframe.py) 中展示了这几个函数的使用方式。
 
 
 第一种线框方法用的是blender的线框修改器，它会基于当前模型的线框生成一个的线框网格模型，这种方法得到的是一个线框网格mesh。这个修改器可以设置线框使用的材质，这个材质是从物体本身的材质列表中选择的，所以有个offset参数，用于设置材质列表中的第几个材质。
 
 第二种线框方法是从材质的角度，物体的材质中提供了一个叫线框的材质节点，我们可以获取这个信息直接绘制出表面的线段，这种方法是在材质图像层面进行的生成。
+
+第三种画笔方法，也就是正方体例子中最右边的效果，使用的是blender的 `grease pencil`，就是blender里面的2D绘画的笔刷。它可以直接在场景的物体模型上画出我们想要的边缘线段。我们可以用这种方式绘制轮廓线、相交线、网格边。
+
+blender之前想渲染物体轮廓，一般会使用freestyle，这种方法的不方便的地方在于必须渲染后才知道效果。而grease pencil可以实时绘制出这些物体**在相机视角下**的轮廓线，它是独立的物体对象，不会影响其他物体的状态，这种绘制可以同时作用到全局的物体，也可以作用于特定对象，创建方式也很容易，在场景中添加物体选项里面，`Grease Pencil` > `Scene Line Art`。它本质上就是一个空白的grease pencil加上一个 `Line Art` 修改器，所以我们可以在这个修改器的 `Edge Types` 里面选择你想要绘制展示的物体边界信息。
+
+<p align='center'><img src="../doc/images/line_art.jpg" width='400'></p>
+
+这种方式可以方便地得到下面的效果，其中黄色的外轮廓和红色的交界线都是用画笔绘制出来的：
+
+<p align='center'><img src="../doc/images/line_art_example.jpg" width='500'></p>
+
+回到线框的话题，要绘制物体的线框其实还需要额外处理，笔画对象使用的 `Line Art` 修改器中，它的 `Edge Types` 属性有个特别的选项 `Edge Marks`，勾选上后笔画对象可以绘制出进行标记的特定边，标记方法如下：选择我们要处理的网格模型，进入编辑模式，编辑对象切换为 `边模式`，按ctrl+a全选边，右键菜单，有个 `mark freestyle edge`，点击后可以发现物体的边颜色变成了蓝色，这意味着标记成功。退出编辑模式，将笔画对象中修改器的 `Edge Marks` 勾选上，就可以成功把线框绘制出来。
+
+<p align='center'><img src="../doc/images/line_art_mark.jpg" width='500'></p>
+
+标记物体边的操作我们也写成了函数，就在 `modifier.py` 的 `mark_freestyle_edge`，所以这种方法下，完整版的线框渲染包括两步：
+标记边，添加笔画，`render_with_lines`中也实现了其他轮廓边的效果，具体可以查看一下函数内容：
+```python
+modifier.mark_freestyle_edge(obj)
+modifier.render_with_lines( 'wireframe', line_thickness, line_color )
+```
 
 </details>
 

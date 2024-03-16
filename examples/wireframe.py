@@ -24,6 +24,7 @@ importlib.reload(models)
 importlib.reload(lighter)
 importlib.reload(viewer)
 importlib.reload(scene)
+importlib.reload(modifier)
 
 def main():
     # clean all object
@@ -36,7 +37,7 @@ def main():
 
     scene.switch_to_collection('Cam_and_light')
     # add cam
-    viewer.set_camera("cam", pos=[0.41, 0, 0.29], angles=[56, 0, 90])
+    viewer.set_camera("cam", pos=[0.469, 0, 0.33], angles=[56, 0, 90])
 
     # add light
     lighter.set_hdr_background( os.path.join(DATA_DIR, "background_and_light/artist_workshop_2k.hdr") )
@@ -45,8 +46,8 @@ def main():
 
     # add 5 cube
     all_cubes = []
-    for i in range(5):
-        cube = models.add_shape("cube", f'cube_{i}', [ 0, -0.2 + i * 0.1, 0.02], [0, 0, np.deg2rad(-0)], [0.03,0.03,0.03], [0.3, 0.3, 0.3, 1])
+    for i in range(6):
+        cube = models.add_shape("cube", f'cube_{i}', [ 0, -0.25 + i * 0.1, 0.02], [0, 0, np.deg2rad(-0)], [0.03,0.03,0.03], [0.3, 0.3, 0.3, 1])
         all_cubes.append(cube)
     
     red = [0.5, 0, 0, 1]
@@ -67,6 +68,11 @@ def main():
     #============----------------   exmaple 4   ----------------============#    
     material.set_object_mat(all_cubes[4], color_mat, clear_pre_mats=False)
     modifier.wireframe( all_cubes[4], wire_thickness=0.04, only_wire=False, offset=1)
+
+    #============----------------   exmaple 5   ----------------============#    
+    # recommend !!!
+    modifier.mark_freestyle_edge(all_cubes[5])
+    modifier.render_with_lines( 'wireframe', line_thickness=1, line_color=(1,0,0,1))
 
     # render
     render.do_render( os.path.join(ROOT_DIR, "./doc/images/wireframe.png") )
